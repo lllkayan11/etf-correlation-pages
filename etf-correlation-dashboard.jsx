@@ -4818,6 +4818,30 @@ const calcMA = (rows, period) => {
   return out;
 };
 
+const calcRSI = (rows, period = 14) => {
+  const out = new Array(rows.length).fill(null);
+  if (rows.length <= period) return out;
+  let gainSum = 0;
+  let lossSum = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = rows[i].close - rows[i - 1].close;
+    if (diff >= 0) gainSum += diff;
+    else lossSum += -diff;
+  }
+  let avgGain = gainSum / period;
+  let avgLoss = lossSum / period;
+  out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < rows.length; i++) {
+    const diff = rows[i].close - rows[i - 1].close;
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return out;
+};
+
 const CandlestickChart = ({ data }) => {
   const [hoverIdx, setHoverIdx] = useState(null);
   if (!data?.length) {
@@ -4826,16 +4850,19 @@ const CandlestickChart = ({ data }) => {
 
   const ma5 = useMemo(() => calcMA(data, 5), [data]);
   const ma20 = useMemo(() => calcMA(data, 20), [data]);
+  const rsi14 = useMemo(() => calcRSI(data, 14), [data]);
 
   const W = 1100;
-  const H = 390;
+  const H = 452;
   const left = 56;
   const right = 12;
   const priceTop = 12;
-  const priceBottom = 265;
-  const volumeTop = 285;
-  const volumeBottom = 360;
-  const axisBottom = 382;
+  const priceBottom = 236;
+  const volumeTop = 252;
+  const volumeBottom = 314;
+  const rsiTop = 332;
+  const rsiBottom = 412;
+  const axisBottom = 442;
 
   const highs = data.map((d) => d.high);
   const lows = data.map((d) => d.low);
@@ -4845,6 +4872,7 @@ const CandlestickChart = ({ data }) => {
   const yPrice = (v) => priceTop + ((maxPrice - v) / span) * (priceBottom - priceTop);
   const maxVol = Math.max(...data.map((d) => d.volume), 1);
   const yVol = (v) => volumeBottom - (v / maxVol) * (volumeBottom - volumeTop);
+  const yRsi = (v) => rsiTop + ((100 - v) / 100) * (rsiBottom - rsiTop);
 
   const innerW = W - left - right;
   const step = innerW / Math.max(data.length, 1);
@@ -4867,6 +4895,7 @@ const CandlestickChart = ({ data }) => {
   const hovered = hoverIdx != null ? data[hoverIdx] : null;
   const hoveredMa5 = hoverIdx != null ? ma5[hoverIdx] : null;
   const hoveredMa20 = hoverIdx != null ? ma20[hoverIdx] : null;
+  const hoveredRsi = hoverIdx != null ? rsi14[hoverIdx] : null;
 
   return (
     <div>
@@ -4907,8 +4936,27 @@ const CandlestickChart = ({ data }) => {
           );
         })}
 
+        {[70,50,30].map((level) => {
+          const py = yRsi(level);
+          return (
+            <g key={`rsi-${level}`}>
+              <line x1={left} y1={py} x2={W - right} y2={py} stroke={level===50 ? "#0a1a2e" : "#1f2937"} strokeDasharray="3 4" />
+              <text x={left - 6} y={py + 3} textAnchor="end" fill={level===50 ? "#1e3a55" : "#4b5563"} fontSize="9" fontFamily="Syne Mono">{level}</text>
+            </g>
+          );
+        })}
+
         <path d={maPath(ma5)} fill="none" stroke="#f59e0b" strokeWidth={1.2} />
         <path d={maPath(ma20)} fill="none" stroke="#60a5fa" strokeWidth={1.2} />
+        <path
+          d={rsi14
+            .map((v, i) => (v == null ? null : `${i === 0 || rsi14[i - 1] == null ? "M" : "L"} ${xOf(i)} ${yRsi(v)}`))
+            .filter(Boolean)
+            .join(" ")}
+          fill="none"
+          stroke="#a78bfa"
+          strokeWidth={1.4}
+        />
 
         {data.map((d, i) => {
           const x = xOf(i);
@@ -4929,8 +4977,9 @@ const CandlestickChart = ({ data }) => {
 
         {hovered && (
           <g>
-            <line x1={xOf(hoverIdx)} x2={xOf(hoverIdx)} y1={priceTop} y2={volumeBottom} stroke="#38bdf8" strokeDasharray="4 4" />
+            <line x1={xOf(hoverIdx)} x2={xOf(hoverIdx)} y1={priceTop} y2={rsiBottom} stroke="#38bdf8" strokeDasharray="4 4" />
             <line x1={left} x2={W - right} y1={yPrice(hovered.close)} y2={yPrice(hovered.close)} stroke="#1d4ed8" strokeDasharray="4 4" opacity={0.7} />
+            {hoveredRsi != null && <line x1={left} x2={W-right} y1={yRsi(hoveredRsi)} y2={yRsi(hoveredRsi)} stroke="#7c3aed" strokeDasharray="4 4" opacity={0.65} />}
           </g>
         )}
 
@@ -4941,12 +4990,12 @@ const CandlestickChart = ({ data }) => {
       </svg>
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px",marginTop:"8px",fontFamily:"'Syne Mono',monospace"}}>
-        <div style={{fontSize:"10px",color:"#3a5a75"}}>MA5 <span style={{color:"#f59e0b"}}>●</span> &nbsp; MA20 <span style={{color:"#60a5fa"}}>●</span> &nbsp; Volume bars in lower panel</div>
+        <div style={{fontSize:"10px",color:"#3a5a75"}}>MA5 <span style={{color:"#f59e0b"}}>●</span> &nbsp; MA20 <span style={{color:"#60a5fa"}}>●</span> &nbsp; RSI14 <span style={{color:"#a78bfa"}}>●</span> &nbsp; Volume bars in lower panel</div>
         {hovered && (
           <div style={{fontSize:"10px",color:"#8fa8c0",textAlign:"right",lineHeight:1.5}}>
             <div>{hovered.date}</div>
             <div>O {hovered.open.toFixed(2)} · H {hovered.high.toFixed(2)} · L {hovered.low.toFixed(2)} · C {hovered.close.toFixed(2)}</div>
-            <div>Adj {hovered.adjClose.toFixed(2)} · Vol {fmtVol(hovered.volume)} · MA5 {hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A"} · MA20 {hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A"}</div>
+            <div>Adj {hovered.adjClose.toFixed(2)} · Vol {fmtVol(hovered.volume)} · MA5 {hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A"} · MA20 {hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A"} · RSI14 {hoveredRsi != null ? hoveredRsi.toFixed(2) : "N/A"}</div>
           </div>
         )}
       </div>

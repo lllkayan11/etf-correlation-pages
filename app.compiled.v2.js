@@ -4886,6 +4886,32 @@ var calcMA = (rows, period) => {
   }
   return out;
 };
+var calcRSI = (rows, period = 14) => {
+  const out = new Array(rows.length).fill(null);
+  if (rows.length <= period)
+    return out;
+  let gainSum = 0;
+  let lossSum = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = rows[i].close - rows[i - 1].close;
+    if (diff >= 0)
+      gainSum += diff;
+    else
+      lossSum += -diff;
+  }
+  let avgGain = gainSum / period;
+  let avgLoss = lossSum / period;
+  out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < rows.length; i++) {
+    const diff = rows[i].close - rows[i - 1].close;
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return out;
+};
 var CandlestickChart = ({ data }) => {
   const [hoverIdx, setHoverIdx] = useState(null);
   if (!data?.length) {
@@ -4895,15 +4921,18 @@ var CandlestickChart = ({ data }) => {
   }
   const ma5 = useMemo(() => calcMA(data, 5), [data]);
   const ma20 = useMemo(() => calcMA(data, 20), [data]);
+  const rsi14 = useMemo(() => calcRSI(data, 14), [data]);
   const W = 1100;
-  const H = 390;
+  const H = 452;
   const left = 56;
   const right = 12;
   const priceTop = 12;
-  const priceBottom = 265;
-  const volumeTop = 285;
-  const volumeBottom = 360;
-  const axisBottom = 382;
+  const priceBottom = 236;
+  const volumeTop = 252;
+  const volumeBottom = 314;
+  const rsiTop = 332;
+  const rsiBottom = 412;
+  const axisBottom = 442;
   const highs = data.map((d) => d.high);
   const lows = data.map((d) => d.low);
   const maxPrice = Math.max(...highs);
@@ -4912,6 +4941,7 @@ var CandlestickChart = ({ data }) => {
   const yPrice = (v) => priceTop + (maxPrice - v) / span * (priceBottom - priceTop);
   const maxVol = Math.max(...data.map((d) => d.volume), 1);
   const yVol = (v) => volumeBottom - v / maxVol * (volumeBottom - volumeTop);
+  const yRsi = (v) => rsiTop + (100 - v) / 100 * (rsiBottom - rsiTop);
   const innerW = W - left - right;
   const step = innerW / Math.max(data.length, 1);
   const bodyW = Math.max(1, Math.min(10, step * 0.62));
@@ -4930,6 +4960,7 @@ var CandlestickChart = ({ data }) => {
   const hovered = hoverIdx != null ? data[hoverIdx] : null;
   const hoveredMa5 = hoverIdx != null ? ma5[hoverIdx] : null;
   const hoveredMa20 = hoverIdx != null ? ma20[hoverIdx] : null;
+  const hoveredRsi = hoverIdx != null ? rsi14[hoverIdx] : null;
   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("svg", {
     width: "100%",
     height: H,
@@ -4983,6 +5014,25 @@ var CandlestickChart = ({ data }) => {
       fontSize: "9",
       fontFamily: "Syne Mono"
     }, p));
+  }), [70, 50, 30].map((level) => {
+    const py = yRsi(level);
+    return /* @__PURE__ */ React.createElement("g", {
+      key: `rsi-${level}`
+    }, /* @__PURE__ */ React.createElement("line", {
+      x1: left,
+      y1: py,
+      x2: W - right,
+      y2: py,
+      stroke: level === 50 ? "#0a1a2e" : "#1f2937",
+      strokeDasharray: "3 4"
+    }), /* @__PURE__ */ React.createElement("text", {
+      x: left - 6,
+      y: py + 3,
+      textAnchor: "end",
+      fill: level === 50 ? "#1e3a55" : "#4b5563",
+      fontSize: "9",
+      fontFamily: "Syne Mono"
+    }, level));
   }), /* @__PURE__ */ React.createElement("path", {
     d: maPath(ma5),
     fill: "none",
@@ -4993,6 +5043,11 @@ var CandlestickChart = ({ data }) => {
     fill: "none",
     stroke: "#60a5fa",
     strokeWidth: 1.2
+  }), /* @__PURE__ */ React.createElement("path", {
+    d: rsi14.map((v, i) => v == null ? null : `${i === 0 || rsi14[i - 1] == null ? "M" : "L"} ${xOf(i)} ${yRsi(v)}`).filter(Boolean).join(" "),
+    fill: "none",
+    stroke: "#a78bfa",
+    strokeWidth: 1.4
   }), data.map((d, i) => {
     const x = xOf(i);
     const up = d.close >= d.open;
@@ -5030,7 +5085,7 @@ var CandlestickChart = ({ data }) => {
     x1: xOf(hoverIdx),
     x2: xOf(hoverIdx),
     y1: priceTop,
-    y2: volumeBottom,
+    y2: rsiBottom,
     stroke: "#38bdf8",
     strokeDasharray: "4 4"
   }), /* @__PURE__ */ React.createElement("line", {
@@ -5041,6 +5096,14 @@ var CandlestickChart = ({ data }) => {
     stroke: "#1d4ed8",
     strokeDasharray: "4 4",
     opacity: 0.7
+  }), hoveredRsi != null && /* @__PURE__ */ React.createElement("line", {
+    x1: left,
+    x2: W - right,
+    y1: yRsi(hoveredRsi),
+    y2: yRsi(hoveredRsi),
+    stroke: "#7c3aed",
+    strokeDasharray: "4 4",
+    opacity: 0.65
   })), data.map((d, i) => {
     if (i % labelStep !== 0 && i !== data.length - 1)
       return null;
@@ -5061,9 +5124,11 @@ var CandlestickChart = ({ data }) => {
     style: { color: "#f59e0b" }
   }, "\u25CF"), " \xA0 MA20 ", /* @__PURE__ */ React.createElement("span", {
     style: { color: "#60a5fa" }
+  }, "\u25CF"), " \xA0 RSI14 ", /* @__PURE__ */ React.createElement("span", {
+    style: { color: "#a78bfa" }
   }, "\u25CF"), " \xA0 Volume bars in lower panel"), hovered && /* @__PURE__ */ React.createElement("div", {
     style: { fontSize: "10px", color: "#8fa8c0", textAlign: "right", lineHeight: 1.5 }
-  }, /* @__PURE__ */ React.createElement("div", null, hovered.date), /* @__PURE__ */ React.createElement("div", null, "O ", hovered.open.toFixed(2), " \xB7 H ", hovered.high.toFixed(2), " \xB7 L ", hovered.low.toFixed(2), " \xB7 C ", hovered.close.toFixed(2)), /* @__PURE__ */ React.createElement("div", null, "Adj ", hovered.adjClose.toFixed(2), " \xB7 Vol ", fmtVol(hovered.volume), " \xB7 MA5 ", hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A", " \xB7 MA20 ", hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A"))));
+  }, /* @__PURE__ */ React.createElement("div", null, hovered.date), /* @__PURE__ */ React.createElement("div", null, "O ", hovered.open.toFixed(2), " \xB7 H ", hovered.high.toFixed(2), " \xB7 L ", hovered.low.toFixed(2), " \xB7 C ", hovered.close.toFixed(2)), /* @__PURE__ */ React.createElement("div", null, "Adj ", hovered.adjClose.toFixed(2), " \xB7 Vol ", fmtVol(hovered.volume), " \xB7 MA5 ", hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A", " \xB7 MA20 ", hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A", " \xB7 RSI14 ", hoveredRsi != null ? hoveredRsi.toFixed(2) : "N/A"))));
 };
 function App() {
   const [tab, setTab] = useState("matrix");
