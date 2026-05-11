@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ETF Correlation Dashboard</title>
+  <meta name="description" content="ETF correlation dashboard with Yahoo adjusted-close data and interactive analysis." />
+  <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "recharts": "https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0"
+      }
+    }
+  </script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #030810; }
+    #app-loading {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      color: #8fa8c0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-loading">LOADING DASHBOARD...</div>
+  <div id="root"></div>
+  <noscript>This page requires JavaScript to run.</noscript>
+  <script type="module">
+    import "./app.bootstrap.js";
+    const loading = document.getElementById("app-loading");
+    if (loading) loading.remove();
+  </script>
+</body>
+</html>
