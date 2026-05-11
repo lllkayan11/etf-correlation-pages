@@ -32,11 +32,25 @@ def fetch_and_save() -> None:
     monthly = adj.resample("ME").last().dropna(how="all")
 
     monthly_payload = {}
+    ohlc_payload = {}
     for ticker in TICKERS:
         series = monthly[ticker].dropna()
         monthly_payload[ticker] = [
             {"date": dt.strftime("%Y-%m"), "price": round(float(value), 2), "year": int(dt.year)}
             for dt, value in series.items()
+        ]
+        ohlc_df = raw[ticker][["Open", "High", "Low", "Close", "Adj Close", "Volume"]].dropna(how="any")
+        ohlc_payload[ticker] = [
+            {
+                "date": dt.strftime("%Y-%m-%d"),
+                "open": round(float(row["Open"]), 4),
+                "high": round(float(row["High"]), 4),
+                "low": round(float(row["Low"]), 4),
+                "close": round(float(row["Close"]), 4),
+                "adjClose": round(float(row["Adj Close"]), 4),
+                "volume": int(row["Volume"]),
+            }
+            for dt, row in ohlc_df.iterrows()
         ]
 
     corr_payload = {
@@ -57,8 +71,12 @@ def fetch_and_save() -> None:
         json.dumps(corr_payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    (OUT_DIR / "yahoo_etf_ohlc.json").write_text(
+        json.dumps(ohlc_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":
     fetch_and_save()
-    print("Saved yahoo_etf_monthly.json and yahoo_etf_corr.json")
+    print("Saved yahoo_etf_monthly.json, yahoo_etf_corr.json and yahoo_etf_ohlc.json")

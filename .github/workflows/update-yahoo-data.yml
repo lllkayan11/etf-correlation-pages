@@ -32,7 +32,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add yahoo_etf_monthly.json yahoo_etf_corr.json
+          git add yahoo_etf_monthly.json yahoo_etf_corr.json yahoo_etf_ohlc.json
           if git diff --staged --quiet; then
             echo "No data changes."
             exit 0

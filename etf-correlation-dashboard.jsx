@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 
 // ─── DATA SOURCES ─────────────────────────────────────────────────────────────
 // Price/correlation data now uses Yahoo Finance adjusted closes (Adj Close).
@@ -4790,14 +4789,81 @@ function generatePriceData(etf) {
 const DEFAULT_CORR_MATRIX = CORR_MATRIX;
 const LOCAL_MONTHLY_URL = "./yahoo_etf_monthly.json";
 const LOCAL_CORR_URL = "./yahoo_etf_corr.json";
+const LOCAL_OHLC_URL = "./yahoo_etf_ohlc.json";
+const RANGE_OPTIONS = [
+  { id: "1M", label: "1M", days: 31 },
+  { id: "3M", label: "3M", days: 92 },
+  { id: "3Y", label: "3Y", days: 1096 },
+  { id: "ALL", label: "ALL", days: null },
+];
 
-const ChartTooltip = ({active,payload,label,color}) => {
-  if (!active||!payload?.length) return null;
+const filterOhlcByRange = (rows, rangeId) => {
+  if (!rows?.length) return [];
+  const option = RANGE_OPTIONS.find((r) => r.id === rangeId) || RANGE_OPTIONS[RANGE_OPTIONS.length - 1];
+  if (!option.days) return rows;
+  const latest = new Date(`${rows[rows.length - 1].date}T00:00:00Z`);
+  const startTs = latest.getTime() - option.days * 24 * 60 * 60 * 1000;
+  return rows.filter((r) => new Date(`${r.date}T00:00:00Z`).getTime() >= startTs);
+};
+
+const CandlestickChart = ({ data }) => {
+  if (!data?.length) {
+    return <div style={{height:"320px",display:"grid",placeItems:"center",color:"#4a6a85",fontFamily:"'Syne Mono',monospace"}}>NO OHLC DATA</div>;
+  }
+  const W = 1100;
+  const H = 320;
+  const left = 56;
+  const right = 12;
+  const top = 12;
+  const bottom = 28;
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const maxPrice = Math.max(...highs);
+  const minPrice = Math.min(...lows);
+  const span = Math.max(0.0001, maxPrice - minPrice);
+  const y = (v) => top + ((maxPrice - v) / span) * (H - top - bottom);
+  const innerW = W - left - right;
+  const step = innerW / Math.max(data.length, 1);
+  const bodyW = Math.max(1, Math.min(10, step * 0.62));
+  const labelStep = Math.max(1, Math.floor(data.length / 6));
+
   return (
-    <div style={{background:"#050c18",border:`1px solid ${color}55`,borderRadius:"6px",padding:"8px 12px",fontFamily:"'Syne Mono',monospace",fontSize:"11px"}}>
-      <div style={{color:"#4b6070",marginBottom:"3px"}}>{label}</div>
-      <div style={{color,fontWeight:700}}>${payload[0].value.toFixed(2)}</div>
-    </div>
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="OHLC candlestick chart">
+      {[0,1,2,3,4].map((i) => {
+        const py = top + (i / 4) * (H - top - bottom);
+        const p = (maxPrice - (i / 4) * span).toFixed(2);
+        return (
+          <g key={`grid-${i}`}>
+            <line x1={left} y1={py} x2={W - right} y2={py} stroke="#0a1a2e" strokeDasharray="2 5" />
+            <text x={left - 6} y={py + 3} textAnchor="end" fill="#1e3a55" fontSize="9" fontFamily="Syne Mono">${p}</text>
+          </g>
+        );
+      })}
+
+      {data.map((d, i) => {
+        const x = left + i * step + step / 2;
+        const up = d.close >= d.open;
+        const color = up ? "#22c55e" : "#ef4444";
+        const yOpen = y(d.open);
+        const yClose = y(d.close);
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyHeight = Math.max(1, Math.abs(yOpen - yClose));
+        return (
+          <g key={d.date}>
+            <line x1={x} x2={x} y1={y(d.high)} y2={y(d.low)} stroke={color} strokeWidth={1} />
+            <rect x={x - bodyW / 2} y={bodyTop} width={bodyW} height={bodyHeight} fill={up ? `${color}AA` : color} stroke={color} strokeWidth={1} />
+            <title>{`${d.date}  O:${d.open.toFixed(2)} H:${d.high.toFixed(2)} L:${d.low.toFixed(2)} C:${d.close.toFixed(2)}`}</title>
+          </g>
+        );
+      })}
+
+      {data.map((d, i) => {
+        if (i % labelStep !== 0 && i !== data.length - 1) return null;
+        const x = left + i * step + step / 2;
+        const label = d.date.slice(2);
+        return <text key={`x-${d.date}`} x={x} y={H - 8} textAnchor="middle" fill="#1e3a55" fontSize="9" fontFamily="Syne Mono">{label}</text>;
+      })}
+    </svg>
   );
 };
 
@@ -4809,22 +4875,26 @@ export default function App() {
   const [selectedPair, setSelectedPair] = useState(null);
   const [monthlyData, setMonthlyData] = useState(YAHOO_MONTHLY_DATA);
   const [corrMatrix, setCorrMatrix] = useState(DEFAULT_CORR_MATRIX);
+  const [ohlcData, setOhlcData] = useState({});
+  const [chartRange, setChartRange] = useState("ALL");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState("");
 
   const loadLocalJsonData = async () => {
     const ts = Date.now();
-    const [monthlyRes, corrRes] = await Promise.all([
+    const [monthlyRes, corrRes, ohlcRes] = await Promise.all([
       fetch(`${LOCAL_MONTHLY_URL}?t=${ts}`, { cache: "no-store" }),
       fetch(`${LOCAL_CORR_URL}?t=${ts}`, { cache: "no-store" }),
+      fetch(`${LOCAL_OHLC_URL}?t=${ts}`, { cache: "no-store" }),
     ]);
 
-    if (!monthlyRes.ok || !corrRes.ok) {
+    if (!monthlyRes.ok || !corrRes.ok || !ohlcRes.ok) {
       throw new Error("local_data_not_found");
     }
 
     const nextMonthly = await monthlyRes.json();
     const corrPayload = await corrRes.json();
+    const nextOhlc = await ohlcRes.json();
     const nextCorr = corrPayload?.corr_matrix;
     const generatedAt = corrPayload?.generated_at_utc;
 
@@ -4834,6 +4904,7 @@ export default function App() {
 
     setMonthlyData(nextMonthly);
     setCorrMatrix(nextCorr);
+    setOhlcData(nextOhlc);
     if (generatedAt) {
       setRefreshMessage(`Published data timestamp (UTC): ${generatedAt}`);
     }
@@ -4860,9 +4931,13 @@ export default function App() {
 
   const allData = useMemo(()=> ETFS.reduce((a,e)=>({...a,[e.ticker]:(monthlyData[e.ticker] || generatePriceData(e))}),{}), [monthlyData]);
   const priceData = useMemo(()=>allData[selected.ticker],[selected,allData]);
+  const dailyOhlcData = useMemo(() => {
+    const rows = ohlcData[selected.ticker] || [];
+    return filterOhlcByRange(rows, chartRange);
+  }, [ohlcData, selected, chartRange]);
 
-  const firstP = priceData[0]?.price||1;
-  const lastP = priceData[priceData.length-1]?.price||1;
+  const firstP = dailyOhlcData[0]?.close ?? priceData[0]?.price ?? 1;
+  const lastP = dailyOhlcData[dailyOhlcData.length-1]?.close ?? priceData[priceData.length-1]?.price ?? 1;
   const totalRet = (((lastP-firstP)/firstP)*100).toFixed(1);
 
   const displayETFs = ETFS.filter(e => visibleETFs.includes(e.id));
@@ -5092,27 +5167,27 @@ export default function App() {
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"28px",fontWeight:700,color:+totalRet>0?"#22c55e":"#ef4444"}}>{+totalRet>0?"+":""}{totalRet}%</div>
-                <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55"}}>2019→LATEST TOTAL</div>
+                <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55"}}>{chartRange} WINDOW RETURN</div>
               </div>
             </div>
 
             <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 16px 10px",marginBottom:"20px"}}>
-              <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",marginBottom:"16px",letterSpacing:".1em"}}>MONTH-END ADJ CLOSE · JAN 2019 – LATEST</div>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={priceData}>
-                  <defs>
-                    <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={selected.color} stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor={selected.color} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="2 5" stroke="#0a1a2e"/>
-                  <XAxis dataKey="date" stroke="#0a1a2e" tick={{fill:"#1e3a55",fontSize:9,fontFamily:"Syne Mono"}} tickFormatter={v=>v.endsWith("-01")?v.slice(0,4):""} interval={11}/>
-                  <YAxis stroke="#0a1a2e" tick={{fill:"#1e3a55",fontSize:9,fontFamily:"Syne Mono"}} tickFormatter={v=>`$${v}`} width={50}/>
-                  <Tooltip content={<ChartTooltip color={selected.color}/>}/>
-                  <Area type="monotone" dataKey="price" stroke={selected.color} fill="url(#ag)" strokeWidth={2} dot={false} activeDot={{r:3,fill:selected.color}}/>
-                </AreaChart>
-              </ResponsiveContainer>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",marginBottom:"10px",flexWrap:"wrap"}}>
+                <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".1em"}}>DAILY OHLC CANDLESTICK · YFINANCE</div>
+                <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                  {RANGE_OPTIONS.map((r) => (
+                    <button
+                      key={r.id}
+                      className={`filter-pill ${chartRange===r.id?"on":""}`}
+                      style={{"--c": selected.color}}
+                      onClick={() => setChartRange(r.id)}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <CandlestickChart data={dailyOhlcData} />
             </div>
 
             {/* Why this ETF rationale */}
