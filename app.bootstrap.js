@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "https://esm.sh/gh/lllkayan11/etf-correlation-pages/etf-correlation-dashboard.jsx";
+import App from "./app.compiled.v2.js";
 
 const rootElement = document.getElementById("root");
 if (rootElement) {
