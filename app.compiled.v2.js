@@ -4872,39 +4872,83 @@ var filterOhlcByRange = (rows, rangeId) => {
   const startTs = latest.getTime() - option.days * 24 * 60 * 60 * 1e3;
   return rows.filter((r) => new Date(`${r.date}T00:00:00Z`).getTime() >= startTs);
 };
+var calcMA = (rows, period) => {
+  const out = new Array(rows.length).fill(null);
+  if (rows.length < period)
+    return out;
+  let rolling = 0;
+  for (let i = 0; i < rows.length; i++) {
+    rolling += rows[i].close;
+    if (i >= period)
+      rolling -= rows[i - period].close;
+    if (i >= period - 1)
+      out[i] = rolling / period;
+  }
+  return out;
+};
 var CandlestickChart = ({ data }) => {
+  const [hoverIdx, setHoverIdx] = useState(null);
   if (!data?.length) {
     return /* @__PURE__ */ React.createElement("div", {
-      style: { height: "320px", display: "grid", placeItems: "center", color: "#4a6a85", fontFamily: "'Syne Mono',monospace" }
+      style: { height: "380px", display: "grid", placeItems: "center", color: "#4a6a85", fontFamily: "'Syne Mono',monospace" }
     }, "NO OHLC DATA");
   }
+  const ma5 = useMemo(() => calcMA(data, 5), [data]);
+  const ma20 = useMemo(() => calcMA(data, 20), [data]);
   const W = 1100;
-  const H = 320;
+  const H = 390;
   const left = 56;
   const right = 12;
-  const top = 12;
-  const bottom = 28;
+  const priceTop = 12;
+  const priceBottom = 265;
+  const volumeTop = 285;
+  const volumeBottom = 360;
+  const axisBottom = 382;
   const highs = data.map((d) => d.high);
   const lows = data.map((d) => d.low);
   const maxPrice = Math.max(...highs);
   const minPrice = Math.min(...lows);
   const span = Math.max(1e-4, maxPrice - minPrice);
-  const y = (v) => top + (maxPrice - v) / span * (H - top - bottom);
+  const yPrice = (v) => priceTop + (maxPrice - v) / span * (priceBottom - priceTop);
+  const maxVol = Math.max(...data.map((d) => d.volume), 1);
+  const yVol = (v) => volumeBottom - v / maxVol * (volumeBottom - volumeTop);
   const innerW = W - left - right;
   const step = innerW / Math.max(data.length, 1);
   const bodyW = Math.max(1, Math.min(10, step * 0.62));
   const labelStep = Math.max(1, Math.floor(data.length / 6));
-  return /* @__PURE__ */ React.createElement("svg", {
+  const xOf = (idx) => left + idx * step + step / 2;
+  const maPath = (values) => values.map((v, i) => v == null ? null : `${i === 0 || values[i - 1] == null ? "M" : "L"} ${xOf(i)} ${yPrice(v)}`).filter(Boolean).join(" ");
+  const fmtVol = (v) => {
+    if (v >= 1e9)
+      return `${(v / 1e9).toFixed(2)}B`;
+    if (v >= 1e6)
+      return `${(v / 1e6).toFixed(2)}M`;
+    if (v >= 1e3)
+      return `${(v / 1e3).toFixed(1)}K`;
+    return `${v}`;
+  };
+  const hovered = hoverIdx != null ? data[hoverIdx] : null;
+  const hoveredMa5 = hoverIdx != null ? ma5[hoverIdx] : null;
+  const hoveredMa20 = hoverIdx != null ? ma20[hoverIdx] : null;
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("svg", {
     width: "100%",
     height: H,
     viewBox: `0 0 ${W} ${H}`,
     role: "img",
-    "aria-label": "OHLC candlestick chart"
+    "aria-label": "OHLC candlestick chart",
+    onMouseMove: (evt) => {
+      const rect = evt.currentTarget.getBoundingClientRect();
+      const x = (evt.clientX - rect.left) / rect.width * W;
+      const raw = Math.round((x - left - step / 2) / step);
+      const idx = Math.max(0, Math.min(data.length - 1, raw));
+      setHoverIdx(idx);
+    },
+    onMouseLeave: () => setHoverIdx(null)
   }, [0, 1, 2, 3, 4].map((i) => {
-    const py = top + i / 4 * (H - top - bottom);
+    const py = priceTop + i / 4 * (priceBottom - priceTop);
     const p = (maxPrice - i / 4 * span).toFixed(2);
     return /* @__PURE__ */ React.createElement("g", {
-      key: `grid-${i}`
+      key: `pgrid-${i}`
     }, /* @__PURE__ */ React.createElement("line", {
       x1: left,
       y1: py,
@@ -4920,12 +4964,41 @@ var CandlestickChart = ({ data }) => {
       fontSize: "9",
       fontFamily: "Syne Mono"
     }, "$", p));
+  }), [0, 1].map((i) => {
+    const py = volumeTop + i / 1 * (volumeBottom - volumeTop);
+    const p = i === 0 ? fmtVol(maxVol) : "0";
+    return /* @__PURE__ */ React.createElement("g", {
+      key: `vgrid-${i}`
+    }, /* @__PURE__ */ React.createElement("line", {
+      x1: left,
+      y1: py,
+      x2: W - right,
+      y2: py,
+      stroke: "#0a1a2e"
+    }), /* @__PURE__ */ React.createElement("text", {
+      x: left - 6,
+      y: py + 3,
+      textAnchor: "end",
+      fill: "#1e3a55",
+      fontSize: "9",
+      fontFamily: "Syne Mono"
+    }, p));
+  }), /* @__PURE__ */ React.createElement("path", {
+    d: maPath(ma5),
+    fill: "none",
+    stroke: "#f59e0b",
+    strokeWidth: 1.2
+  }), /* @__PURE__ */ React.createElement("path", {
+    d: maPath(ma20),
+    fill: "none",
+    stroke: "#60a5fa",
+    strokeWidth: 1.2
   }), data.map((d, i) => {
-    const x = left + i * step + step / 2;
+    const x = xOf(i);
     const up = d.close >= d.open;
     const color = up ? "#22c55e" : "#ef4444";
-    const yOpen = y(d.open);
-    const yClose = y(d.close);
+    const yOpen = yPrice(d.open);
+    const yClose = yPrice(d.close);
     const bodyTop = Math.min(yOpen, yClose);
     const bodyHeight = Math.max(1, Math.abs(yOpen - yClose));
     return /* @__PURE__ */ React.createElement("g", {
@@ -4933,8 +5006,8 @@ var CandlestickChart = ({ data }) => {
     }, /* @__PURE__ */ React.createElement("line", {
       x1: x,
       x2: x,
-      y1: y(d.high),
-      y2: y(d.low),
+      y1: yPrice(d.high),
+      y2: yPrice(d.low),
       stroke: color,
       strokeWidth: 1
     }), /* @__PURE__ */ React.createElement("rect", {
@@ -4945,22 +5018,52 @@ var CandlestickChart = ({ data }) => {
       fill: up ? `${color}AA` : color,
       stroke: color,
       strokeWidth: 1
-    }), /* @__PURE__ */ React.createElement("title", null, `${d.date}  O:${d.open.toFixed(2)} H:${d.high.toFixed(2)} L:${d.low.toFixed(2)} C:${d.close.toFixed(2)}`));
-  }), data.map((d, i) => {
+    }), /* @__PURE__ */ React.createElement("rect", {
+      x: x - bodyW / 2,
+      y: yVol(d.volume),
+      width: bodyW,
+      height: Math.max(1, volumeBottom - yVol(d.volume)),
+      fill: up ? "#14532d" : "#7f1d1d",
+      opacity: 0.8
+    }));
+  }), hovered && /* @__PURE__ */ React.createElement("g", null, /* @__PURE__ */ React.createElement("line", {
+    x1: xOf(hoverIdx),
+    x2: xOf(hoverIdx),
+    y1: priceTop,
+    y2: volumeBottom,
+    stroke: "#38bdf8",
+    strokeDasharray: "4 4"
+  }), /* @__PURE__ */ React.createElement("line", {
+    x1: left,
+    x2: W - right,
+    y1: yPrice(hovered.close),
+    y2: yPrice(hovered.close),
+    stroke: "#1d4ed8",
+    strokeDasharray: "4 4",
+    opacity: 0.7
+  })), data.map((d, i) => {
     if (i % labelStep !== 0 && i !== data.length - 1)
       return null;
-    const x = left + i * step + step / 2;
-    const label = d.date.slice(2);
     return /* @__PURE__ */ React.createElement("text", {
       key: `x-${d.date}`,
-      x,
-      y: H - 8,
+      x: xOf(i),
+      y: axisBottom,
       textAnchor: "middle",
       fill: "#1e3a55",
       fontSize: "9",
       fontFamily: "Syne Mono"
-    }, label);
-  }));
+    }, d.date.slice(2));
+  })), /* @__PURE__ */ React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginTop: "8px", fontFamily: "'Syne Mono',monospace" }
+  }, /* @__PURE__ */ React.createElement("div", {
+    style: { fontSize: "10px", color: "#3a5a75" }
+  }, "MA5 ", /* @__PURE__ */ React.createElement("span", {
+    style: { color: "#f59e0b" }
+  }, "\u25CF"), " \xA0 MA20 ", /* @__PURE__ */ React.createElement("span", {
+    style: { color: "#60a5fa" }
+  }, "\u25CF"), " \xA0 Volume bars in lower panel"), hovered && /* @__PURE__ */ React.createElement("div", {
+    style: { fontSize: "10px", color: "#8fa8c0", textAlign: "right", lineHeight: 1.5 }
+  }, /* @__PURE__ */ React.createElement("div", null, hovered.date), /* @__PURE__ */ React.createElement("div", null, "O ", hovered.open.toFixed(2), " \xB7 H ", hovered.high.toFixed(2), " \xB7 L ", hovered.low.toFixed(2), " \xB7 C ", hovered.close.toFixed(2)), /* @__PURE__ */ React.createElement("div", null, "Adj ", hovered.adjClose.toFixed(2), " \xB7 Vol ", fmtVol(hovered.volume), " \xB7 MA5 ", hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A", " \xB7 MA20 ", hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A"))));
 };
 function App() {
   const [tab, setTab] = useState("matrix");
