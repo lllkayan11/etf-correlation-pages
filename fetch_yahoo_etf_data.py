@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -42,6 +43,7 @@ def fetch_and_save() -> None:
         "tickers": TICKERS,
         "start": START,
         "end": "latest",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "trading_days_common": int(len(returns_common)),
         "monthly_points": int(len(monthly)),
         "corr_matrix": [[float(corr.loc[r, c]) for c in TICKERS] for r in TICKERS],

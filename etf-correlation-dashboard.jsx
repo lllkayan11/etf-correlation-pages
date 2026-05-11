@@ -4790,7 +4790,6 @@ function generatePriceData(etf) {
 const DEFAULT_CORR_MATRIX = CORR_MATRIX;
 const LOCAL_MONTHLY_URL = "./yahoo_etf_monthly.json";
 const LOCAL_CORR_URL = "./yahoo_etf_corr.json";
-const LOCAL_REFRESH_API = "http://127.0.0.1:8765/refresh-yahoo";
 
 const ChartTooltip = ({active,payload,label,color}) => {
   if (!active||!payload?.length) return null;
@@ -4827,6 +4826,7 @@ export default function App() {
     const nextMonthly = await monthlyRes.json();
     const corrPayload = await corrRes.json();
     const nextCorr = corrPayload?.corr_matrix;
+    const generatedAt = corrPayload?.generated_at_utc;
 
     if (!nextCorr || !Array.isArray(nextCorr) || nextCorr.length !== ETFS.length) {
       throw new Error("invalid_corr_matrix");
@@ -4834,18 +4834,19 @@ export default function App() {
 
     setMonthlyData(nextMonthly);
     setCorrMatrix(nextCorr);
+    if (generatedAt) {
+      setRefreshMessage(`Published data timestamp (UTC): ${generatedAt}`);
+    }
   };
 
   const handleRefreshData = async () => {
     setIsRefreshing(true);
-    setRefreshMessage("Refreshing...");
+    setRefreshMessage("Reloading published JSON...");
     try {
-      // Optional local bridge: if local refresh server is running, trigger re-download first.
-      await fetch(LOCAL_REFRESH_API, { method: "POST" }).catch(() => null);
       await loadLocalJsonData();
-      setRefreshMessage("Refreshed from local Yahoo data.");
+      setRefreshMessage((prev) => prev || "Published JSON reloaded.");
     } catch (error) {
-      setRefreshMessage("Refresh failed. Please run local refresh server or update JSON files.");
+      setRefreshMessage("Reload failed. Please wait for GitHub Pages to finish deployment.");
     } finally {
       setIsRefreshing(false);
     }
@@ -4906,9 +4907,9 @@ export default function App() {
             onClick={handleRefreshData}
             disabled={isRefreshing}
             style={{color:isRefreshing ? "#4a6a85" : "#22c55e", borderColor:"#1b3b2a"}}
-            title="Refresh data from local JSON files (and optional local API trigger)."
+            title="Reload published JSON data from GitHub Pages."
           >
-            {isRefreshing ? "REFRESHING..." : "REFRESH DATA"}
+            {isRefreshing ? "RELOADING..." : "RELOAD DATA"}
           </button>
           {[["matrix","CORR MATRIX"],["chart","PRICE CHART"],["report","SUPERVISOR REPORT"],["sources","DATA SOURCES"]].map(([v,l])=>(
             <button key={v} className={`nav-tab ${tab===v?"on":""}`} onClick={()=>setTab(v)}>{l}</button>
