@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import BacktestPanel from "./backtest-panel.jsx";
 
 // ─── DATA SOURCES ─────────────────────────────────────────────────────────────
 // Price/correlation data now uses Yahoo Finance adjusted closes (Adj Close).
@@ -5122,7 +5123,7 @@ export default function App() {
           >
             {isRefreshing ? "RELOADING..." : "RELOAD DATA"}
           </button>
-          {[["matrix","CORR MATRIX"],["chart","PRICE CHART"],["report","SUPERVISOR REPORT"],["sources","DATA SOURCES"]].map(([v,l])=>(
+          {[["matrix","CORR MATRIX"],["chart","PRICE CHART"],["backtest","BACKTEST"],["report","SUPERVISOR REPORT"],["sources","DATA SOURCES"]].map(([v,l])=>(
             <button key={v} className={`nav-tab ${tab===v?"on":""}`} onClick={()=>setTab(v)}>{l}</button>
           ))}
         </div>
@@ -5349,6 +5350,10 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {tab==="backtest" && (
+          <BacktestPanel etfs={ETFS} corrMatrix={corrMatrix} ohlcData={ohlcData} />
         )}
 
         {/* ══════════════════════════════ SUPERVISOR REPORT ══════════════════════════════ */}
