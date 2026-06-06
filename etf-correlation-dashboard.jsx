@@ -5064,7 +5064,7 @@ function OnboardingTutorial({
   if (!open) return null;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(3,8,16,.78)",backdropFilter:"blur(6px)",zIndex:60,display:"grid",placeItems:"center",padding:"24px"}}>
-      <div style={{width:"min(980px, 100%)",background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"16px",boxShadow:"0 20px 60px rgba(0,0,0,.45)",overflow:"hidden"}}>
+      <div style={{width:"min(980px, 100%)",background:"#060e1c",border:"1px solid #12263b",borderRadius:"18px",boxShadow:"0 24px 80px rgba(0,0,0,.5)",overflow:"hidden"}}>
         <div style={{padding:"22px 24px",borderBottom:"1px solid #0a1a2e",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"16px"}}>
           <div>
             <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>FIRST-TIME GUIDE</div>
@@ -5153,9 +5153,10 @@ function WorkflowLaunchpad({
   const modeGuide = getModeGuide(tab, bridgeReady);
 
   return (
-    <div style={{padding:"18px 28px",borderBottom:"1px solid #08172a",background:"linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))"}}>
-      <div style={{display:"grid",gridTemplateColumns:"1.2fr .8fr",gap:"16px",alignItems:"stretch"}}>
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+    <div style={{padding:"18px 28px 10px 28px",borderBottom:"1px solid #08172a",background:"linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))"}}>
+      <div className="shell">
+        <div style={{display:"grid",gridTemplateColumns:"1.15fr .85fr",gap:"14px",alignItems:"stretch"}}>
+        <div className="terminal-card" style={{padding:"20px 22px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>START HERE</div>
           <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:"8px"}}>Choose the fastest workflow for what you want to do</div>
           <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"12px"}}>
@@ -5177,7 +5178,7 @@ function WorkflowLaunchpad({
           </div>
         </div>
 
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+        <div className="terminal-card" style={{padding:"20px 22px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"12px"}}>CURRENT MODE GUIDE</div>
           <div style={{display:"grid",gap:"10px"}}>
             {[
@@ -5192,6 +5193,7 @@ function WorkflowLaunchpad({
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -5344,29 +5346,35 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet"/>
       <style>{`
         *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#070f1c}::-webkit-scrollbar-thumb{background:#1a3050;border-radius:2px}
-        .etf-pill{cursor:pointer;padding:7px 14px;border-radius:20px;border:1px solid #0e2035;background:transparent;font-family:'Syne Mono',monospace;font-size:11px;color:#3a5570;transition:all .15s;white-space:nowrap}
-        .etf-pill:hover{border-color:#1a3858;color:#8fa8c0}
-        .etf-pill.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);color:var(--c)}
-        .nav-tab{cursor:pointer;padding:9px 22px;border-radius:4px;font-size:12px;font-family:'Syne Mono',monospace;letter-spacing:.06em;border:1px solid transparent;transition:all .15s;color:#2d4560}
-        .nav-tab.on{background:#071525;border-color:#0e2540;color:#8fb8d8}
-        .nav-tab:hover:not(.on){color:#4a6a85}
-        .corr-cell{cursor:pointer;transition:transform .1s;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Syne Mono',monospace;font-size:10px;font-weight:600}
+        body{background:#030810}
+        ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:#070f1c}::-webkit-scrollbar-thumb{background:#1a3050;border-radius:3px}
+        .shell{max-width:1540px;margin:0 auto;width:100%}
+        .terminal-card{background:linear-gradient(180deg, rgba(9,18,32,.94), rgba(6,14,28,.98));border:1px solid #102438;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+        .terminal-card-soft{background:#030810;border:1px solid #0f2236;border-radius:10px}
+        .etf-pill{cursor:pointer;padding:8px 14px;border-radius:999px;border:1px solid #13263b;background:rgba(6,14,28,.86);font-family:'Syne Mono',monospace;font-size:11px;color:#47627f;transition:all .15s ease;white-space:nowrap;line-height:1}
+        .etf-pill:hover{border-color:#21405f;color:#9bb2c8;transform:translateY(-1px)}
+        .etf-pill.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,rgba(6,14,28,.92));color:var(--c);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 18%,transparent)}
+        .nav-tab{cursor:pointer;padding:10px 16px;min-height:38px;border-radius:8px;font-size:11px;font-family:'Syne Mono',monospace;letter-spacing:.08em;border:1px solid #13263b;transition:all .15s ease;color:#55708c;background:rgba(6,14,28,.88);line-height:1;text-transform:uppercase}
+        .nav-tab.on{background:#0a1b2d;border-color:#184064;color:#9dc3df}
+        .nav-tab:hover:not(.on){color:#9bb2c8;border-color:#20405f;background:#091726}
+        .nav-tab:disabled{opacity:.5;cursor:not-allowed;transform:none}
+        .corr-cell{cursor:pointer;transition:transform .1s;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Syne Mono',monospace;font-size:10px;font-weight:600}
         .corr-cell:hover{transform:scale(1.08);z-index:2;position:relative}
-        .filter-pill{cursor:pointer;padding:4px 10px;border-radius:4px;border:1px solid #1a3858;background:#060e1c;font-family:'Syne Mono',monospace;font-size:10px;color:#4a6a85;transition:all .15s}
-        .filter-pill:hover{background:#0a1e32;color:#8fa8c0}
+        .filter-pill{cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #17314d;background:#081322;font-family:'Syne Mono',monospace;font-size:10px;color:#5c7692;transition:all .15s ease;line-height:1}
+        .filter-pill:hover{background:#0c1d31;color:#a0bfd8;border-color:#254a6e}
         .filter-pill.on{background:#0e2540;border-color:var(--c);color:var(--c)}
         @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         .fade{animation:up .25s ease}
       `}</style>
 
       {/* HEADER */}
-      <div style={{borderBottom:"1px solid #0a1a2e",padding:"16px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,background:"rgba(3,8,16,.97)",zIndex:20}}>
+      <div style={{borderBottom:"1px solid #0a1a2e",padding:"14px 28px",position:"sticky",top:0,background:"rgba(3,8,16,.94)",backdropFilter:"blur(10px)",zIndex:20}}>
+        <div className="shell" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"18px",flexWrap:"wrap"}}>
         <div>
-          <div style={{fontWeight:800,fontSize:"20px",letterSpacing:".02em",color:"#f0f6ff"}}>CORRELATION ANALYSIS DASHBOARD</div>
-          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e4060",marginTop:"2px",letterSpacing:".08em"}}>10 GLOBALLY DIVERSIFIED ETFs · DAILY ADJ CLOSE DATA · 2019–2026</div>
+          <div style={{fontWeight:800,fontSize:"18px",letterSpacing:".03em",color:"#f0f6ff"}}>CORRELATION ANALYSIS DASHBOARD</div>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#35516c",marginTop:"4px",letterSpacing:".1em"}}>10 GLOBALLY DIVERSIFIED ETFs · DAILY ADJ CLOSE DATA · 2019–2026</div>
         </div>
-        <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+        <div style={{display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap"}}>
           <button
             className="nav-tab"
             onClick={() => setShowTutorial(true)}
@@ -5388,10 +5396,13 @@ export default function App() {
             <button key={v} className={`nav-tab ${tab===v?"on":""}`} onClick={()=>openTab(v)}>{l}</button>
           ))}
         </div>
+        </div>
       </div>
       {refreshMessage && (
-        <div style={{padding:"8px 28px",borderBottom:"1px solid #08172a",fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0"}}>
-          {refreshMessage}
+        <div style={{padding:"8px 28px",borderBottom:"1px solid #08172a"}}>
+          <div className="shell" style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0"}}>
+            {refreshMessage}
+          </div>
         </div>
       )}
 
@@ -5423,17 +5434,20 @@ export default function App() {
 
       {/* ETF SELECTOR */}
       {showGlobalSelector && (
-        <div style={{padding:"14px 28px",borderBottom:"1px solid #08172a",display:"flex",gap:"8px",flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",marginRight:"4px",letterSpacing:".08em"}}>SELECT ▸</span>
-          {ETFS.map(e=>(
-            <button key={e.ticker} className={`etf-pill ${selected.ticker===e.ticker?"on":""}`} style={{"--c":e.color}} onClick={()=>setSelected(e)}>
-              {e.ticker} <span style={{opacity:.5,fontSize:"9px"}}>{e.region}</span>
-            </button>
-          ))}
+        <div style={{padding:"12px 28px 14px 28px",borderBottom:"1px solid #08172a"}}>
+          <div className="shell" style={{display:"flex",gap:"8px",flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#28445e",marginRight:"4px",letterSpacing:".1em"}}>SELECT ▸</span>
+            {ETFS.map(e=>(
+              <button key={e.ticker} className={`etf-pill ${selected.ticker===e.ticker?"on":""}`} style={{"--c":e.color}} onClick={()=>setSelected(e)}>
+                {e.ticker} <span style={{opacity:.58,fontSize:"9px"}}>{e.region}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      <div style={{padding:"24px 28px"}} className="fade" key={tab+selected.ticker}>
+      <div style={{padding:"20px 28px 28px 28px"}} className="fade" key={tab+selected.ticker}>
+      <div className="shell">
 
         {/* ══════════════════════════════ CORRELATION MATRIX ══════════════════════════════ */}
         {tab==="matrix" && (
@@ -5597,7 +5611,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 16px 10px",marginBottom:"20px"}}>
+            <div className="terminal-card" style={{padding:"18px 18px 10px",marginBottom:"18px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",marginBottom:"10px",flexWrap:"wrap"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".1em"}}>DAILY OHLC CANDLESTICK · YFINANCE</div>
                 <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
@@ -5617,13 +5631,13 @@ export default function App() {
             </div>
 
             {/* Why this ETF rationale */}
-            <div style={{background:"#060e1c",border:`1px solid ${selected.color}22`,borderLeft:`3px solid ${selected.color}`,borderRadius:"10px",padding:"20px 22px"}}>
+            <div className="terminal-card" style={{borderColor:`${selected.color}22`,borderLeft:`3px solid ${selected.color}`,padding:"18px 20px"}}>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:selected.color,letterSpacing:".1em",marginBottom:"12px"}}>▸ CORRELATION RATIONALE FOR SUPERVISOR REPORT</div>
               <div style={{fontSize:"13px",color:"#8fa8c0",lineHeight:1.85}}>{selected.why_full}</div>
             </div>
 
             {/* Correlations with this ETF */}
-            <div style={{marginTop:"20px",background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"10px",padding:"20px"}}>
+            <div className="terminal-card" style={{marginTop:"18px",padding:"18px 20px"}}>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".1em",marginBottom:"14px"}}>{selected.ticker} PAIRWISE CORRELATIONS</div>
               <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
                 {ETFS.filter(e=>e.ticker!==selected.ticker).map(e=>{
@@ -5652,7 +5666,7 @@ export default function App() {
         {/* ══════════════════════════════ SUPERVISOR REPORT ══════════════════════════════ */}
         {tab==="report" && (
           <div style={{maxWidth:"860px",margin:"0 auto"}}>
-            <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"36px 40px"}}>
+            <div className="terminal-card" style={{padding:"34px 38px"}}>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>INTERNAL RESEARCH MEMORANDUM</div>
               <div style={{fontWeight:800,fontSize:"22px",color:"#f0f6ff",marginBottom:"4px",lineHeight:1.3}}>ETF Selection Rationale for Correlation Analysis Study</div>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"11px",color:"#2d4a65",marginBottom:"32px",paddingBottom:"24px",borderBottom:"1px solid #0a1e32"}}>
@@ -5701,7 +5715,7 @@ export default function App() {
                     ["Bonds vs. Commodities (TLT/DBC)","~-0.12 — negative; inflation raises DBC, damages TLT"],
                     ["Japan vs. China (EWJ/KWEB)","~0.38 — low; BOJ vs. PBOC policy environments are structurally divergent"],
                   ].map(([pair,desc])=>(
-                    <div key={pair} style={{background:"#070f1e",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"12px 14px"}}>
+                    <div key={pair} className="terminal-card-soft" style={{padding:"12px 14px"}}>
                       <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#d1d9e6",marginBottom:"5px"}}>{pair}</div>
                       <div style={{fontSize:"11px",color:"#3a5570",lineHeight:1.6}}>{desc}</div>
                     </div>
@@ -5709,7 +5723,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{background:"rgba(34,197,94,.05)",border:"1px solid rgba(34,197,94,.15)",borderRadius:"8px",padding:"18px 20px"}}>
+              <div style={{background:"rgba(34,197,94,.05)",border:"1px solid rgba(34,197,94,.15)",borderRadius:"12px",padding:"18px 20px"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#22c55e",letterSpacing:".08em",marginBottom:"10px"}}>04 — CONCLUSION</div>
                 <div style={{fontSize:"13px",color:"#7a9ab5",lineHeight:1.9}}>
                   This 10-ETF portfolio spans <strong style={{color:"#d1d9e6"}}>6 geographic regions</strong>, <strong style={{color:"#d1d9e6"}}>5 central bank policy environments</strong>, and <strong style={{color:"#d1d9e6"}}>3 asset classes</strong>. The average pairwise correlation of the portfolio is approximately <strong style={{color:"#22c55e"}}>0.30</strong> — well below a US-only equity portfolio which would average 0.80+. Critically, the portfolio contains <strong style={{color:"#d1d9e6"}}>multiple negatively correlated pairs</strong> (SPY/TLT, TLT/DBC) and near-zero pairs (SPY/GLD), providing genuine diversification benefit rather than mere sector rotation. This selection provides the broadest possible base for a statistically meaningful correlation analysis.
@@ -5726,7 +5740,7 @@ export default function App() {
         {/* ══════════════════════════════ DATA SOURCES ══════════════════════════════ */}
         {tab==="sources" && (
           <div style={{maxWidth:"860px",margin:"0 auto"}} className="fade">
-            <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"36px 40px"}}>
+            <div className="terminal-card" style={{padding:"34px 38px"}}>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>METHODOLOGY & REFERENCES</div>
               <div style={{fontWeight:800,fontSize:"22px",color:"#f0f6ff",marginBottom:"24px",lineHeight:1.3}}>Data Sources and Calculation Methodology</div>
               
@@ -5741,7 +5755,7 @@ export default function App() {
                     ["Fund Fact Sheets", "BlackRock/iShares and State Street SPDR official reports for AUM, Expense Ratios, and Holdings."],
                     ["Common Sample Window", "Correlation matrix uses overlapping daily observations across all ETFs."]
                   ].map(([src, desc])=>(
-                    <div key={src} style={{display:"flex", gap:"16px", alignItems:"baseline", background:"#030810", padding:"12px 16px", borderRadius:"6px", border:"1px solid #0a1a2e"}}>
+                    <div key={src} className="terminal-card-soft" style={{display:"flex", gap:"16px", alignItems:"baseline", padding:"12px 16px"}}>
                       <div style={{fontFamily:"'Syne Mono',monospace", color:"#8fb8d8", fontSize:"12px", fontWeight:700, minWidth:"140px"}}>{src}</div>
                       <div style={{fontSize:"13px", color:"#7a9ab5"}}>{desc}</div>
                     </div>
@@ -5751,7 +5765,7 @@ export default function App() {
 
               <div style={{marginBottom:"28px"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"11px",color:"#22c55e",letterSpacing:".08em",marginBottom:"12px"}}>PRICE SERIES CONSTRUCTION</div>
-                <div style={{fontSize:"13px",color:"#7a9ab5",lineHeight:1.8, background:"#030810", padding:"16px", borderRadius:"6px", border:"1px solid #0a1a2e"}}>
+                <div className="terminal-card-soft" style={{fontSize:"13px",color:"#7a9ab5",lineHeight:1.8, padding:"16px"}}>
                   Price charts now use <strong>real month-end adjusted closes</strong> directly from Yahoo Finance via yfinance (no interpolation, no simulated path). <br/><br/>
                   For each ETF, daily Adj Close is downloaded from 2019-01-01 onward, then resampled to month-end closes for visualization. Adjusted prices account for distributions/corporate actions, making cross-asset return comparisons more consistent.
                 </div>
@@ -5759,7 +5773,7 @@ export default function App() {
 
               <div style={{marginBottom:"28px"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"11px",color:"#22c55e",letterSpacing:".08em",marginBottom:"12px"}}>CORRELATION MATRIX CONSTRUCTION</div>
-                <div style={{fontSize:"13px",color:"#7a9ab5",lineHeight:1.8, background:"#030810", padding:"16px", borderRadius:"6px", border:"1px solid #0a1a2e"}}>
+                <div className="terminal-card-soft" style={{fontSize:"13px",color:"#7a9ab5",lineHeight:1.8, padding:"16px"}}>
                   Pairwise correlations are computed from <strong>daily returns of adjusted close prices</strong> over the common sample window (2019–latest). This avoids subjective parameter tuning and directly reflects observed co-movement in market data.
                 </div>
               </div>
@@ -5770,6 +5784,7 @@ export default function App() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

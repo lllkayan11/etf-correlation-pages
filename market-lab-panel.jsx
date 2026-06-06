@@ -279,7 +279,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
   return (
     <div>
       <div style={{display:"grid",gridTemplateColumns:"1.25fr .75fr",gap:"14px",alignItems:"stretch",marginBottom:"16px"}}>
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"18px 20px"}}>
+        <div className="terminal-card" style={{padding:"18px 20px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>FULL UNIVERSE MODE</div>
           <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:"8px"}}>Yahoo Search + Dynamic Correlation + Portfolio Backtest</div>
           <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.6,marginBottom:"12px"}}>
@@ -289,7 +289,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
             <input
               value={query}
               placeholder="Search Apple / Tesla / 0700.HK / TSM / BTC-USD"
-              style={{flex:1,minWidth:"260px",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"10px 12px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+              style={{flex:1,minWidth:"260px",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"11px 12px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -334,7 +334,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
           )}
         </div>
 
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"18px 20px"}}>
+        <div className="terminal-card" style={{padding:"18px 20px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"10px"}}>UNIVERSE STATUS</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"10px"}}>
             {[
@@ -343,7 +343,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
               ["Search Mode", bridgeReady ? "ONLINE" : "OFFLINE"],
               ["Benchmark", "SPY"],
             ].map(([label, value]) => (
-              <div key={label} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px",padding:"12px 14px"}}>
+              <div key={label} className="terminal-card-soft" style={{padding:"12px 14px"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#1e3a55",letterSpacing:".1em",marginBottom:"6px"}}>{label}</div>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"14px",fontWeight:700,color:"#d1d9e6"}}>{value}</div>
               </div>
@@ -352,7 +352,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
         </div>
       </div>
 
-      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"18px 20px",marginBottom:"16px"}}>
+      <div className="terminal-card" style={{padding:"18px 20px",marginBottom:"16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap",marginBottom:"12px"}}>
           <div>
             <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>STARTER PACKS</div>
@@ -371,7 +371,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
               pack.symbols.length === universeTickers.length &&
               pack.symbols.every((symbol) => universeTickers.includes(symbol));
             return (
-              <div key={pack.id} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"10px",padding:"14px 16px"}}>
+              <div key={pack.id} className="terminal-card-soft" style={{padding:"14px 16px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px",marginBottom:"6px"}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:"15px",color:"#f0f6ff"}}>{pack.title}</div>
@@ -430,14 +430,14 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
       </div>
 
       {(searchBusy || searchResults.length > 0) && (
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"16px 18px",marginBottom:"18px"}}>
+        <div className="terminal-card" style={{padding:"16px 18px",marginBottom:"18px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0",marginBottom:"12px"}}>{searchBusy ? "SEARCHING YAHOO..." : "SEARCH RESULTS"}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"10px"}}>
             {searchResults.map((item) => {
               const symbol = item.symbol;
               const imported = !!ohlcData?.[symbol]?.length;
               return (
-                <div key={symbol} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px",padding:"12px 14px"}}>
+                <div key={symbol} className="terminal-card-soft" style={{padding:"12px 14px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",gap:"10px",alignItems:"center",marginBottom:"6px"}}>
                     <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"13px",fontWeight:700,color:colorFromTicker(symbol)}}>{symbol}</div>
                     <button className="filter-pill" onClick={() => importSymbol(symbol)} disabled={!!importingSymbol || !!importingPack}>
@@ -455,7 +455,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
         </div>
       )}
 
-      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"16px 20px",marginBottom:"16px"}}>
+      <div className="terminal-card" style={{padding:"16px 20px",marginBottom:"16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap",marginBottom:"10px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0"}}>ACTIVE UNIVERSE</div>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#4a6a85"}}>
@@ -482,7 +482,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
         </div>
       </div>
 
-      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px",marginBottom:"18px",overflowX:"auto"}}>
+      <div className="terminal-card" style={{padding:"20px 22px",marginBottom:"18px",overflowX:"auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",marginBottom:"14px",flexWrap:"wrap"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em"}}>
             DYNAMIC CORRELATION MATRIX — DAILY ADJ CLOSE RETURN BASIS
@@ -541,7 +541,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId
         )}
 
         {selectedPair && (
-          <div style={{marginTop:"16px",padding:"16px 18px",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px"}}>
+          <div className="terminal-card-soft" style={{marginTop:"16px",padding:"16px 18px"}}>
             <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"11px",color:"#8fb8d8",marginBottom:"6px"}}>
               {selectedPair.a?.ticker} × {selectedPair.b?.ticker}: {selectedPair.corr.toFixed(2)}
             </div>

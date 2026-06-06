@@ -342,7 +342,7 @@ export default function BacktestPanel({
   return (
     <div>
       <div style={{display:"flex",gap:"16px",flexWrap:"wrap",alignItems:"stretch"}}>
-        <div style={{flex:1,minWidth:"320px",background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+        <div className="terminal-card" style={{flex:1,minWidth:"320px",padding:"20px 22px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>BACKTEST SYSTEM</div>
           <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:description ? "8px" : "14px"}}>{title}</div>
           {description ? (
@@ -393,7 +393,7 @@ export default function BacktestPanel({
                     type="number"
                     step="0.1"
                     min="0"
-                    style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                    style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                     onChange={(ev) => setWeightsPct((prev) => ({ ...prev, [t]: Number(ev.target.value) }))}
                   />
                 </React.Fragment>
@@ -424,7 +424,7 @@ export default function BacktestPanel({
                 type="date"
                 min={dateBounds.start || undefined}
                 max={dateBounds.end || undefined}
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
@@ -435,7 +435,7 @@ export default function BacktestPanel({
                 type="date"
                 min={dateBounds.start || undefined}
                 max={dateBounds.end || undefined}
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
@@ -449,7 +449,7 @@ export default function BacktestPanel({
                 type="number"
                 step="100"
                 min="0"
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setInitialCapital(Number(e.target.value))}
               />
             </div>
@@ -457,7 +457,7 @@ export default function BacktestPanel({
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#1e3a55",letterSpacing:".1em",marginBottom:"6px"}}>REBALANCE</div>
               <select
                 value={rebalance}
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setRebalance(e.target.value)}
               >
                 <option value="none">none</option>
@@ -476,7 +476,7 @@ export default function BacktestPanel({
                 type="number"
                 step="0.1"
                 min="0"
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setFeeBps(Number(e.target.value))}
               />
             </div>
@@ -487,7 +487,7 @@ export default function BacktestPanel({
                 type="number"
                 step="0.1"
                 min="0"
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setSlippageBps(Number(e.target.value))}
               />
             </div>
@@ -497,7 +497,7 @@ export default function BacktestPanel({
                 value={riskFree}
                 type="number"
                 step="0.1"
-                style={{width:"100%",background:"#030810",border:"1px solid #0a1a2e",borderRadius:"6px",padding:"8px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
+                style={{width:"100%",background:"#030810",border:"1px solid #12263b",borderRadius:"8px",padding:"9px 10px",color:"#d1d9e6",fontFamily:"Syne Mono",fontSize:"11px"}}
                 onChange={(e) => setRiskFree(Number(e.target.value))}
               />
             </div>
@@ -533,7 +533,7 @@ export default function BacktestPanel({
         </div>
 
         <div style={{flex:1.3,minWidth:"360px"}}>
-          <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px",marginBottom:"16px"}}>
+          <div className="terminal-card" style={{padding:"20px 22px",marginBottom:"16px"}}>
             <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"10px"}}>CORE METRICS</div>
             {result?.metrics ? (
               <div style={{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"10px"}}>
@@ -545,7 +545,7 @@ export default function BacktestPanel({
                   ["Sortino", result.metrics.sortino.toFixed(2)],
                   [`${benchmarkTicker || "Benchmark"} Return`, result.metrics.benchmarkTotalReturn == null ? "N/A" : formatPct(result.metrics.benchmarkTotalReturn)],
                 ].map(([k, v]) => (
-                  <div key={k} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px",padding:"12px 14px"}}>
+                  <div key={k} className="terminal-card-soft" style={{padding:"12px 14px"}}>
                     <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#1e3a55",letterSpacing:".1em",marginBottom:"6px"}}>{k}</div>
                     <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"14px",fontWeight:700,color:"#d1d9e6"}}>{v}</div>
                   </div>
@@ -556,7 +556,7 @@ export default function BacktestPanel({
             )}
           </div>
 
-          <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+          <div className="terminal-card" style={{padding:"20px 22px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",marginBottom:"10px",flexWrap:"wrap"}}>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em"}}>{`EQUITY CURVE (PORTFOLIO VS ${benchmarkTicker || "BENCHMARK"})`}</div>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#3a5a75"}}>

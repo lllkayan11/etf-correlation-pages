@@ -666,7 +666,8 @@ function BacktestPanel({
   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
     style: { display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "stretch" }
   }, /* @__PURE__ */ React.createElement("div", {
-    style: { flex: 1, minWidth: "320px", background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+    className: "terminal-card",
+    style: { flex: 1, minWidth: "320px", padding: "20px 22px" }
   }, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "BACKTEST SYSTEM"), /* @__PURE__ */ React.createElement("div", {
@@ -717,7 +718,7 @@ function BacktestPanel({
       type: "number",
       step: "0.1",
       min: "0",
-      style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+      style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
       onChange: (ev) => setWeightsPct((prev) => ({ ...prev, [t]: Number(ev.target.value) }))
     }));
   })), /* @__PURE__ */ React.createElement("div", {
@@ -740,7 +741,7 @@ function BacktestPanel({
     type: "date",
     min: dateBounds.start || void 0,
     max: dateBounds.end || void 0,
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setStartDate(e.target.value)
   })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
@@ -749,7 +750,7 @@ function BacktestPanel({
     type: "date",
     min: dateBounds.start || void 0,
     max: dateBounds.end || void 0,
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setEndDate(e.target.value)
   }))), /* @__PURE__ */ React.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }
@@ -760,13 +761,13 @@ function BacktestPanel({
     type: "number",
     step: "100",
     min: "0",
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setInitialCapital(Number(e.target.value))
   })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
   }, "REBALANCE"), /* @__PURE__ */ React.createElement("select", {
     value: rebalance,
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setRebalance(e.target.value)
   }, /* @__PURE__ */ React.createElement("option", {
     value: "none"
@@ -785,7 +786,7 @@ function BacktestPanel({
     type: "number",
     step: "0.1",
     min: "0",
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setFeeBps(Number(e.target.value))
   })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
@@ -794,7 +795,7 @@ function BacktestPanel({
     type: "number",
     step: "0.1",
     min: "0",
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setSlippageBps(Number(e.target.value))
   })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
@@ -802,7 +803,7 @@ function BacktestPanel({
     value: riskFree,
     type: "number",
     step: "0.1",
-    style: { width: "100%", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "8px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { width: "100%", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "9px 10px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setRiskFree(Number(e.target.value))
   }))), /* @__PURE__ */ React.createElement("div", {
     style: { display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }
@@ -830,7 +831,8 @@ function BacktestPanel({
   }, status)), /* @__PURE__ */ React.createElement("div", {
     style: { flex: 1.3, minWidth: "360px" }
   }, /* @__PURE__ */ React.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "16px" }
+    className: "terminal-card",
+    style: { padding: "20px 22px", marginBottom: "16px" }
   }, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "10px" }
   }, "CORE METRICS"), result?.metrics ? /* @__PURE__ */ React.createElement("div", {
@@ -844,7 +846,8 @@ function BacktestPanel({
     [`${benchmarkTicker || "Benchmark"} Return`, result.metrics.benchmarkTotalReturn == null ? "N/A" : formatPct(result.metrics.benchmarkTotalReturn)]
   ].map(([k, v]) => /* @__PURE__ */ React.createElement("div", {
     key: k,
-    style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
+    className: "terminal-card-soft",
+    style: { padding: "12px 14px" }
   }, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
   }, k), /* @__PURE__ */ React.createElement("div", {
@@ -852,7 +855,8 @@ function BacktestPanel({
   }, v)))) : /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#4a6a85" }
   }, "Run a backtest to generate metrics.")), /* @__PURE__ */ React.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+    className: "terminal-card",
+    style: { padding: "20px 22px" }
   }, /* @__PURE__ */ React.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }
   }, /* @__PURE__ */ React.createElement("div", {
@@ -1146,7 +1150,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
   return /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "1.25fr .75fr", gap: "14px", alignItems: "stretch", marginBottom: "16px" }
   }, /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "18px 20px" }
+    className: "terminal-card",
+    style: { padding: "18px 20px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "FULL UNIVERSE MODE"), /* @__PURE__ */ React2.createElement("div", {
@@ -1158,7 +1163,7 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
   }, /* @__PURE__ */ React2.createElement("input", {
     value: query,
     placeholder: "Search Apple / Tesla / 0700.HK / TSM / BTC-USD",
-    style: { flex: 1, minWidth: "260px", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "10px 12px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    style: { flex: 1, minWidth: "260px", background: "#030810", border: "1px solid #12263b", borderRadius: "8px", padding: "11px 12px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
     onChange: (e) => setQuery(e.target.value),
     onKeyDown: (e) => {
       if (e.key === "Enter") {
@@ -1186,7 +1191,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
   }, "Best execution path: run the app via `python3 local_refresh_server.py`, then open `http://127.0.0.1:8765/`."), status && /* @__PURE__ */ React2.createElement("div", {
     style: { marginTop: "12px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fb8d8" }
   }, status)), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "18px 20px" }
+    className: "terminal-card",
+    style: { padding: "18px 20px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "10px" }
   }, "UNIVERSE STATUS"), /* @__PURE__ */ React2.createElement("div", {
@@ -1198,13 +1204,15 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
     ["Benchmark", "SPY"]
   ].map(([label, value]) => /* @__PURE__ */ React2.createElement("div", {
     key: label,
-    style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
+    className: "terminal-card-soft",
+    style: { padding: "12px 14px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
   }, label), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "14px", fontWeight: 700, color: "#d1d9e6" }
   }, value)))))), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "18px 20px", marginBottom: "16px" }
+    className: "terminal-card",
+    style: { padding: "18px 20px", marginBottom: "16px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }
   }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
@@ -1220,7 +1228,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
     const isActive = pack.symbols.length === universeTickers.length && pack.symbols.every((symbol) => universeTickers.includes(symbol));
     return /* @__PURE__ */ React2.createElement("div", {
       key: pack.id,
-      style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "10px", padding: "14px 16px" }
+      className: "terminal-card-soft",
+      style: { padding: "14px 16px" }
     }, /* @__PURE__ */ React2.createElement("div", {
       style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "6px" }
     }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
@@ -1259,7 +1268,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
       title: pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Load pack and immediately run the default backtest"
     }, importingPack === `${pack.id}-run` ? "RUNNING..." : "LOAD + RUN")));
   }))), (searchBusy || searchResults.length > 0) && /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "16px 18px", marginBottom: "18px" }
+    className: "terminal-card",
+    style: { padding: "16px 18px", marginBottom: "18px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "12px" }
   }, searchBusy ? "SEARCHING YAHOO..." : "SEARCH RESULTS"), /* @__PURE__ */ React2.createElement("div", {
@@ -1269,7 +1279,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
     const imported = !!ohlcData?.[symbol]?.length;
     return /* @__PURE__ */ React2.createElement("div", {
       key: symbol,
-      style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
+      className: "terminal-card-soft",
+      style: { padding: "12px 14px" }
     }, /* @__PURE__ */ React2.createElement("div", {
       style: { display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginBottom: "6px" }
     }, /* @__PURE__ */ React2.createElement("div", {
@@ -1284,7 +1295,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
       style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#3a5a75" }
     }, (item.typeDisp || item.quoteType || "Yahoo").toUpperCase(), " \xB7 ", item.exchDisp || item.exchange || "Yahoo"));
   }))), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "16px 20px", marginBottom: "16px" }
+    className: "terminal-card",
+    style: { padding: "16px 20px", marginBottom: "16px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "10px" }
   }, /* @__PURE__ */ React2.createElement("div", {
@@ -1306,7 +1318,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
       style: { opacity: 0.7 }
     }, "\xD7") : null);
   }))), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "18px", overflowX: "auto" }
+    className: "terminal-card",
+    style: { padding: "20px 22px", marginBottom: "18px", overflowX: "auto" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }
   }, /* @__PURE__ */ React2.createElement("div", {
@@ -1347,7 +1360,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
   })))) : /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#4a6a85" }
   }, "Import at least 2 Yahoo symbols to generate a dynamic correlation matrix."), selectedPair && /* @__PURE__ */ React2.createElement("div", {
-    style: { marginTop: "16px", padding: "16px 18px", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px" }
+    className: "terminal-card-soft",
+    style: { marginTop: "16px", padding: "16px 18px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#8fb8d8", marginBottom: "6px" }
   }, selectedPair.a?.ticker, " \xD7 ", selectedPair.b?.ticker, ": ", selectedPair.corr.toFixed(2)), /* @__PURE__ */ React2.createElement("div", {
@@ -6552,7 +6566,7 @@ function OnboardingTutorial({
   return /* @__PURE__ */ React3.createElement("div", {
     style: { position: "fixed", inset: 0, background: "rgba(3,8,16,.78)", backdropFilter: "blur(6px)", zIndex: 60, display: "grid", placeItems: "center", padding: "24px" }
   }, /* @__PURE__ */ React3.createElement("div", {
-    style: { width: "min(980px, 100%)", background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,.45)", overflow: "hidden" }
+    style: { width: "min(980px, 100%)", background: "#060e1c", border: "1px solid #12263b", borderRadius: "18px", boxShadow: "0 24px 80px rgba(0,0,0,.5)", overflow: "hidden" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { padding: "22px 24px", borderBottom: "1px solid #0a1a2e", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }
   }, /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
@@ -6627,11 +6641,14 @@ function WorkflowLaunchpad({
   const statusText = bridgeReady ? "Full Yahoo universe mode is ready. Best next step: open UNIVERSE LAB." : bridgeChecked ? "Online ETF dashboard is ready. To unlock arbitrary Yahoo symbol search, start local_refresh_server.py and open http://127.0.0.1:8765/." : "Checking whether the local Yahoo bridge is available...";
   const modeGuide = getModeGuide(tab, bridgeReady);
   return /* @__PURE__ */ React3.createElement("div", {
-    style: { padding: "18px 28px", borderBottom: "1px solid #08172a", background: "linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))" }
+    style: { padding: "18px 28px 10px 28px", borderBottom: "1px solid #08172a", background: "linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))" }
   }, /* @__PURE__ */ React3.createElement("div", {
-    style: { display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: "16px", alignItems: "stretch" }
+    className: "shell"
   }, /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+    style: { display: "grid", gridTemplateColumns: "1.15fr .85fr", gap: "14px", alignItems: "stretch" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    className: "terminal-card",
+    style: { padding: "20px 22px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "START HERE"), /* @__PURE__ */ React3.createElement("div", {
@@ -6659,7 +6676,8 @@ function WorkflowLaunchpad({
     className: "nav-tab",
     onClick: onShowTutorial
   }, "HOW TO USE"))), /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+    className: "terminal-card",
+    style: { padding: "20px 22px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "12px" }
   }, "CURRENT MODE GUIDE"), /* @__PURE__ */ React3.createElement("div", {
@@ -6675,7 +6693,7 @@ function WorkflowLaunchpad({
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fb8d8", marginBottom: "4px" }
   }, title), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.6 }
-  }, text)))))));
+  }, text))))))));
 }
 function App() {
   const [tab, setTab] = useState3("matrix");
@@ -6811,28 +6829,36 @@ function App() {
     rel: "stylesheet"
   }), /* @__PURE__ */ React3.createElement("style", null, `
         *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#070f1c}::-webkit-scrollbar-thumb{background:#1a3050;border-radius:2px}
-        .etf-pill{cursor:pointer;padding:7px 14px;border-radius:20px;border:1px solid #0e2035;background:transparent;font-family:'Syne Mono',monospace;font-size:11px;color:#3a5570;transition:all .15s;white-space:nowrap}
-        .etf-pill:hover{border-color:#1a3858;color:#8fa8c0}
-        .etf-pill.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);color:var(--c)}
-        .nav-tab{cursor:pointer;padding:9px 22px;border-radius:4px;font-size:12px;font-family:'Syne Mono',monospace;letter-spacing:.06em;border:1px solid transparent;transition:all .15s;color:#2d4560}
-        .nav-tab.on{background:#071525;border-color:#0e2540;color:#8fb8d8}
-        .nav-tab:hover:not(.on){color:#4a6a85}
-        .corr-cell{cursor:pointer;transition:transform .1s;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Syne Mono',monospace;font-size:10px;font-weight:600}
+        body{background:#030810}
+        ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:#070f1c}::-webkit-scrollbar-thumb{background:#1a3050;border-radius:3px}
+        .shell{max-width:1540px;margin:0 auto;width:100%}
+        .terminal-card{background:linear-gradient(180deg, rgba(9,18,32,.94), rgba(6,14,28,.98));border:1px solid #102438;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+        .terminal-card-soft{background:#030810;border:1px solid #0f2236;border-radius:10px}
+        .etf-pill{cursor:pointer;padding:8px 14px;border-radius:999px;border:1px solid #13263b;background:rgba(6,14,28,.86);font-family:'Syne Mono',monospace;font-size:11px;color:#47627f;transition:all .15s ease;white-space:nowrap;line-height:1}
+        .etf-pill:hover{border-color:#21405f;color:#9bb2c8;transform:translateY(-1px)}
+        .etf-pill.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,rgba(6,14,28,.92));color:var(--c);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 18%,transparent)}
+        .nav-tab{cursor:pointer;padding:10px 16px;min-height:38px;border-radius:8px;font-size:11px;font-family:'Syne Mono',monospace;letter-spacing:.08em;border:1px solid #13263b;transition:all .15s ease;color:#55708c;background:rgba(6,14,28,.88);line-height:1;text-transform:uppercase}
+        .nav-tab.on{background:#0a1b2d;border-color:#184064;color:#9dc3df}
+        .nav-tab:hover:not(.on){color:#9bb2c8;border-color:#20405f;background:#091726}
+        .nav-tab:disabled{opacity:.5;cursor:not-allowed;transform:none}
+        .corr-cell{cursor:pointer;transition:transform .1s;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Syne Mono',monospace;font-size:10px;font-weight:600}
         .corr-cell:hover{transform:scale(1.08);z-index:2;position:relative}
-        .filter-pill{cursor:pointer;padding:4px 10px;border-radius:4px;border:1px solid #1a3858;background:#060e1c;font-family:'Syne Mono',monospace;font-size:10px;color:#4a6a85;transition:all .15s}
-        .filter-pill:hover{background:#0a1e32;color:#8fa8c0}
+        .filter-pill{cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #17314d;background:#081322;font-family:'Syne Mono',monospace;font-size:10px;color:#5c7692;transition:all .15s ease;line-height:1}
+        .filter-pill:hover{background:#0c1d31;color:#a0bfd8;border-color:#254a6e}
         .filter-pill.on{background:#0e2540;border-color:var(--c);color:var(--c)}
         @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         .fade{animation:up .25s ease}
       `), /* @__PURE__ */ React3.createElement("div", {
-    style: { borderBottom: "1px solid #0a1a2e", padding: "16px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "rgba(3,8,16,.97)", zIndex: 20 }
+    style: { borderBottom: "1px solid #0a1a2e", padding: "14px 28px", position: "sticky", top: 0, background: "rgba(3,8,16,.94)", backdropFilter: "blur(10px)", zIndex: 20 }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    className: "shell",
+    style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "18px", flexWrap: "wrap" }
   }, /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
-    style: { fontWeight: 800, fontSize: "20px", letterSpacing: ".02em", color: "#f0f6ff" }
+    style: { fontWeight: 800, fontSize: "18px", letterSpacing: ".03em", color: "#f0f6ff" }
   }, "CORRELATION ANALYSIS DASHBOARD"), /* @__PURE__ */ React3.createElement("div", {
-    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e4060", marginTop: "2px", letterSpacing: ".08em" }
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#35516c", marginTop: "4px", letterSpacing: ".1em" }
   }, "10 GLOBALLY DIVERSIFIED ETFs \xB7 DAILY ADJ CLOSE DATA \xB7 2019\u20132026")), /* @__PURE__ */ React3.createElement("div", {
-    style: { display: "flex", gap: "6px", alignItems: "center" }
+    style: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }
   }, /* @__PURE__ */ React3.createElement("button", {
     className: "nav-tab",
     onClick: () => setShowTutorial(true),
@@ -6848,9 +6874,12 @@ function App() {
     key: v,
     className: `nav-tab ${tab === v ? "on" : ""}`,
     onClick: () => openTab(v)
-  }, l)))), refreshMessage && /* @__PURE__ */ React3.createElement("div", {
-    style: { padding: "8px 28px", borderBottom: "1px solid #08172a", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0" }
-  }, refreshMessage), /* @__PURE__ */ React3.createElement(OnboardingTutorial, {
+  }, l))))), refreshMessage && /* @__PURE__ */ React3.createElement("div", {
+    style: { padding: "8px 28px", borderBottom: "1px solid #08172a" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    className: "shell",
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0" }
+  }, refreshMessage)), /* @__PURE__ */ React3.createElement(OnboardingTutorial, {
     open: showTutorial,
     bridgeReady,
     onClose: closeTutorial,
@@ -6873,20 +6902,25 @@ function App() {
     onOpenLab: () => openTab("lab"),
     onShowTutorial: () => setShowTutorial(true)
   }), showGlobalSelector && /* @__PURE__ */ React3.createElement("div", {
-    style: { padding: "14px 28px", borderBottom: "1px solid #08172a", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }
+    style: { padding: "12px 28px 14px 28px", borderBottom: "1px solid #08172a" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    className: "shell",
+    style: { display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }
   }, /* @__PURE__ */ React3.createElement("span", {
-    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", marginRight: "4px", letterSpacing: ".08em" }
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#28445e", marginRight: "4px", letterSpacing: ".1em" }
   }, "SELECT \u25B8"), ETFS.map((e) => /* @__PURE__ */ React3.createElement("button", {
     key: e.ticker,
     className: `etf-pill ${selected.ticker === e.ticker ? "on" : ""}`,
     style: { "--c": e.color },
     onClick: () => setSelected(e)
   }, e.ticker, " ", /* @__PURE__ */ React3.createElement("span", {
-    style: { opacity: 0.5, fontSize: "9px" }
-  }, e.region)))), /* @__PURE__ */ React3.createElement("div", {
-    style: { padding: "24px 28px" },
+    style: { opacity: 0.58, fontSize: "9px" }
+  }, e.region))))), /* @__PURE__ */ React3.createElement("div", {
+    style: { padding: "20px 28px 28px 28px" },
     className: "fade",
     key: tab + selected.ticker
+  }, /* @__PURE__ */ React3.createElement("div", {
+    className: "shell"
   }, tab === "matrix" && /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }
   }, /* @__PURE__ */ React3.createElement("div", {
@@ -7030,7 +7064,8 @@ function App() {
   }, +totalRet > 0 ? "+" : "", totalRet, "%"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55" }
   }, chartRange, " WINDOW RETURN"))), /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 16px 10px", marginBottom: "20px" }
+    className: "terminal-card",
+    style: { padding: "18px 18px 10px", marginBottom: "18px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }
   }, /* @__PURE__ */ React3.createElement("div", {
@@ -7045,13 +7080,15 @@ function App() {
   }, r.label)))), /* @__PURE__ */ React3.createElement(CandlestickChart, {
     data: dailyOhlcData
   })), /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "#060e1c", border: `1px solid ${selected.color}22`, borderLeft: `3px solid ${selected.color}`, borderRadius: "10px", padding: "20px 22px" }
+    className: "terminal-card",
+    style: { borderColor: `${selected.color}22`, borderLeft: `3px solid ${selected.color}`, padding: "18px 20px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: selected.color, letterSpacing: ".1em", marginBottom: "12px" }
   }, "\u25B8 CORRELATION RATIONALE FOR SUPERVISOR REPORT"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#8fa8c0", lineHeight: 1.85 }
   }, selected.why_full)), /* @__PURE__ */ React3.createElement("div", {
-    style: { marginTop: "20px", background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "10px", padding: "20px" }
+    className: "terminal-card",
+    style: { marginTop: "18px", padding: "18px 20px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "14px" }
   }, selected.ticker, " PAIRWISE CORRELATIONS"), /* @__PURE__ */ React3.createElement("div", {
@@ -7079,7 +7116,8 @@ function App() {
   }), tab === "report" && /* @__PURE__ */ React3.createElement("div", {
     style: { maxWidth: "860px", margin: "0 auto" }
   }, /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "36px 40px" }
+    className: "terminal-card",
+    style: { padding: "34px 38px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "INTERNAL RESEARCH MEMORANDUM"), /* @__PURE__ */ React3.createElement("div", {
@@ -7138,13 +7176,14 @@ function App() {
     ["Japan vs. China (EWJ/KWEB)", "~0.38 \u2014 low; BOJ vs. PBOC policy environments are structurally divergent"]
   ].map(([pair, desc]) => /* @__PURE__ */ React3.createElement("div", {
     key: pair,
-    style: { background: "#070f1e", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "12px 14px" }
+    className: "terminal-card-soft",
+    style: { padding: "12px 14px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#d1d9e6", marginBottom: "5px" }
   }, pair), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "11px", color: "#3a5570", lineHeight: 1.6 }
   }, desc))))), /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "rgba(34,197,94,.05)", border: "1px solid rgba(34,197,94,.15)", borderRadius: "8px", padding: "18px 20px" }
+    style: { background: "rgba(34,197,94,.05)", border: "1px solid rgba(34,197,94,.15)", borderRadius: "12px", padding: "18px 20px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "10px" }
   }, "04 \u2014 CONCLUSION"), /* @__PURE__ */ React3.createElement("div", {
@@ -7165,7 +7204,8 @@ function App() {
     style: { maxWidth: "860px", margin: "0 auto" },
     className: "fade"
   }, /* @__PURE__ */ React3.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "36px 40px" }
+    className: "terminal-card",
+    style: { padding: "34px 38px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "METHODOLOGY & REFERENCES"), /* @__PURE__ */ React3.createElement("div", {
@@ -7185,7 +7225,8 @@ function App() {
     ["Common Sample Window", "Correlation matrix uses overlapping daily observations across all ETFs."]
   ].map(([src, desc]) => /* @__PURE__ */ React3.createElement("div", {
     key: src,
-    style: { display: "flex", gap: "16px", alignItems: "baseline", background: "#030810", padding: "12px 16px", borderRadius: "6px", border: "1px solid #0a1a2e" }
+    className: "terminal-card-soft",
+    style: { display: "flex", gap: "16px", alignItems: "baseline", padding: "12px 16px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", color: "#8fb8d8", fontSize: "12px", fontWeight: 700, minWidth: "140px" }
   }, src), /* @__PURE__ */ React3.createElement("div", {
@@ -7195,16 +7236,18 @@ function App() {
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "12px" }
   }, "PRICE SERIES CONSTRUCTION"), /* @__PURE__ */ React3.createElement("div", {
-    style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.8, background: "#030810", padding: "16px", borderRadius: "6px", border: "1px solid #0a1a2e" }
+    className: "terminal-card-soft",
+    style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.8, padding: "16px" }
   }, "Price charts now use ", /* @__PURE__ */ React3.createElement("strong", null, "real month-end adjusted closes"), " directly from Yahoo Finance via yfinance (no interpolation, no simulated path). ", /* @__PURE__ */ React3.createElement("br", null), /* @__PURE__ */ React3.createElement("br", null), "For each ETF, daily Adj Close is downloaded from 2019-01-01 onward, then resampled to month-end closes for visualization. Adjusted prices account for distributions/corporate actions, making cross-asset return comparisons more consistent.")), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
   }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "12px" }
   }, "CORRELATION MATRIX CONSTRUCTION"), /* @__PURE__ */ React3.createElement("div", {
-    style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.8, background: "#030810", padding: "16px", borderRadius: "6px", border: "1px solid #0a1a2e" }
+    className: "terminal-card-soft",
+    style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.8, padding: "16px" }
   }, "Pairwise correlations are computed from ", /* @__PURE__ */ React3.createElement("strong", null, "daily returns of adjusted close prices"), " over the common sample window (2019\u2013latest). This avoids subjective parameter tuning and directly reflects observed co-movement in market data.")), /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "32px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5570", lineHeight: 1.6, borderTop: "1px solid #0a1e32", paddingTop: "16px" }
-  }, /* @__PURE__ */ React3.createElement("strong", null, "DISCLAIMER:"), " This dashboard is an interactive analytical research tool. Price series and correlation metrics are derived from Yahoo Finance adjusted-close data and may change as new data becomes available. It is not intended as direct financial advice.")))));
+  }, /* @__PURE__ */ React3.createElement("strong", null, "DISCLAIMER:"), " This dashboard is an interactive analytical research tool. Price series and correlation metrics are derived from Yahoo Finance adjusted-close data and may change as new data becomes available. It is not intended as direct financial advice."))))));
 }
 export {
   App as default
