@@ -30,6 +30,28 @@ export const computeMinCorrWeights = (tickers, corrMatrix, etfs) => {
   return normalizeWeights(raw);
 };
 
+export const computeMinCorrWeightsFromLookup = (tickers, corrLookup) => {
+  if (!tickers.length) return {};
+  const raw = {};
+  for (let i = 0; i < tickers.length; i++) {
+    const tI = tickers[i];
+    let s = 0;
+    let c = 0;
+    for (let j = 0; j < tickers.length; j++) {
+      if (i === j) continue;
+      const tJ = tickers[j];
+      const v = corrLookup?.[tI]?.[tJ];
+      if (typeof v === "number" && Number.isFinite(v)) {
+        s += v;
+        c += 1;
+      }
+    }
+    const avg = c ? s / c : 0;
+    raw[tI] = clamp(1 - avg, 0.001, 10);
+  }
+  return normalizeWeights(raw);
+};
+
 export const alignAdjCloseSeries = (ohlcByTicker, tickers, startDate, endDate) => {
   const mapByTicker = {};
   for (const t of tickers) {
@@ -53,6 +75,62 @@ export const alignAdjCloseSeries = (ohlcByTicker, tickers, startDate, endDate) =
     prices[t] = commonDates.map((d) => m.get(d));
   }
   return { dates: commonDates, prices };
+};
+
+const mean = (arr) => arr.reduce((a, b) => a + b, 0) / Math.max(1, arr.length);
+
+const pearsonCorr = (a, b) => {
+  const n = Math.min(a.length, b.length);
+  if (n < 2) return null;
+  const ma = mean(a);
+  const mb = mean(b);
+  let cov = 0;
+  let va = 0;
+  let vb = 0;
+  for (let i = 0; i < n; i++) {
+    const da = a[i] - ma;
+    const db = b[i] - mb;
+    cov += da * db;
+    va += da * da;
+    vb += db * db;
+  }
+  if (va <= 0 || vb <= 0) return null;
+  return cov / Math.sqrt(va * vb);
+};
+
+export const computeCorrelationLookupFromOhlc = (ohlcByTicker, tickers, startDate, endDate) => {
+  const names = Array.from(new Set((tickers || []).filter(Boolean)));
+  if (!names.length) {
+    return { tickers: [], dates: [], matrix: [], lookup: {}, aligned: { dates: [], prices: {} } };
+  }
+  const aligned = alignAdjCloseSeries(ohlcByTicker, names, startDate, endDate);
+  const returnsByTicker = {};
+  for (const t of names) {
+    const prices = aligned.prices?.[t] || [];
+    const vals = [];
+    for (let i = 1; i < prices.length; i++) {
+      const prev = Number(prices[i - 1]);
+      const curr = Number(prices[i]);
+      if (!Number.isFinite(prev) || !Number.isFinite(curr) || prev <= 0 || curr <= 0) continue;
+      vals.push(curr / prev - 1);
+    }
+    returnsByTicker[t] = vals;
+  }
+  const lookup = {};
+  const matrix = names.map((rowTicker, rowIdx) => {
+    lookup[rowTicker] = lookup[rowTicker] || {};
+    return names.map((colTicker, colIdx) => {
+      if (rowIdx === colIdx) {
+        lookup[rowTicker][colTicker] = 1;
+        return 1;
+      }
+      const v = pearsonCorr(returnsByTicker[rowTicker] || [], returnsByTicker[colTicker] || []);
+      const next = v == null ? 0 : v;
+      lookup[rowTicker][colTicker] = next;
+      return next;
+    });
+  });
+  return { tickers: names, dates: aligned.dates.slice(1), matrix, lookup, aligned };
 };
 
 const rebalanceKey = (dateStr, freq) => {

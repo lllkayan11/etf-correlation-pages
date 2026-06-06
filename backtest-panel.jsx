@@ -3,6 +3,7 @@ import {
   alignAdjCloseSeries,
   runPortfolioBacktest,
   computeMinCorrWeights,
+  computeMinCorrWeightsFromLookup,
   normalizeWeights,
   equityToCsv,
   downloadText,
@@ -108,9 +109,34 @@ const EquityCurveChart = ({ equity }) => {
   );
 };
 
-export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
-  const [tickers, setTickers] = useState(["SPY", "TLT"]);
-  const [weightsPct, setWeightsPct] = useState({ SPY: 60, TLT: 40 });
+const deriveDefaultTickers = (assets, preferred) => {
+  const all = (assets || []).map((item) => item.ticker);
+  const preferredValid = (preferred || []).filter((ticker) => all.includes(ticker));
+  if (preferredValid.length) return preferredValid;
+  if (all.includes("SPY") && all.includes("TLT")) return ["SPY", "TLT"];
+  return all.slice(0, Math.min(3, all.length));
+};
+
+export default function BacktestPanel({
+  etfs,
+  corrMatrix,
+  corrLookup,
+  ohlcData,
+  benchmarkTicker = "SPY",
+  defaultTickers,
+  title = "Portfolio Backtest (Rebalance + Benchmark)",
+  description = "",
+  helperNote = "",
+}) {
+  const [tickers, setTickers] = useState(() => deriveDefaultTickers(etfs, defaultTickers));
+  const [weightsPct, setWeightsPct] = useState(() => {
+    const initial = deriveDefaultTickers(etfs, defaultTickers);
+    if (initial.length === 2 && initial.includes("SPY") && initial.includes("TLT")) {
+      return { SPY: 60, TLT: 40 };
+    }
+    const eq = initial.length ? 100 / initial.length : 0;
+    return Object.fromEntries(initial.map((ticker) => [ticker, eq]));
+  });
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [initialCapital, setInitialCapital] = useState(100000);
@@ -121,8 +147,18 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
   const [result, setResult] = useState(null);
   const [status, setStatus] = useState("");
 
+  useEffect(() => {
+    const available = new Set((etfs || []).map((item) => item.ticker));
+    const nextDefault = deriveDefaultTickers(etfs, defaultTickers);
+    setTickers((prev) => {
+      const filtered = prev.filter((ticker) => available.has(ticker));
+      if (filtered.length) return filtered;
+      return nextDefault;
+    });
+  }, [defaultTickers, etfs]);
+
   const dateBounds = useMemo(() => {
-    const tickersForAlign = Array.from(new Set([...tickers, "SPY"]));
+    const tickersForAlign = Array.from(new Set([...tickers, benchmarkTicker].filter(Boolean)));
     if (!tickers.length || !tickersForAlign.every((t) => (ohlcData?.[t] || []).length)) {
       return { start: "", end: "", count: 0 };
     }
@@ -186,7 +222,9 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
       return;
     }
     if (preset === "mincorr") {
-      const wDec = computeMinCorrWeights(tickers, corrMatrix, etfs);
+      const wDec = corrLookup
+        ? computeMinCorrWeightsFromLookup(tickers, corrLookup)
+        : computeMinCorrWeights(tickers, corrMatrix, etfs);
       const wPct = {};
       for (const t of tickers) wPct[t] = (wDec[t] || 0) * 100;
       setWeightsPct(wPct);
@@ -196,9 +234,9 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
   const run = () => {
     setStatus("");
     setResult(null);
-    const tickersForAlign = Array.from(new Set([...tickers, "SPY"]));
+    const tickersForAlign = Array.from(new Set([...tickers, benchmarkTicker].filter(Boolean)));
     if (!tickers.length) {
-      setStatus("Please select at least 1 ETF.");
+      setStatus("Please select at least 1 asset.");
       return;
     }
     if (!tickersForAlign.every((t) => (ohlcData?.[t] || []).length)) {
@@ -235,7 +273,7 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
       initialCapital,
       weightsByTicker: w,
       rebalanceFreq: rebalance,
-      benchmarkTicker: "SPY",
+      benchmarkTicker,
       feeBps,
       slippageBps,
       riskFreeRateAnnual: (Number(riskFree) || 0) / 100,
@@ -252,15 +290,25 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
       <div style={{display:"flex",gap:"16px",flexWrap:"wrap",alignItems:"stretch"}}>
         <div style={{flex:1,minWidth:"320px",background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>BACKTEST SYSTEM</div>
-          <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:"14px"}}>Portfolio Backtest (Rebalance + Benchmark)</div>
+          <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:description ? "8px" : "14px"}}>{title}</div>
+          {description ? (
+            <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"14px"}}>{description}</div>
+          ) : null}
 
           <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"14px"}}>
-            <button className="filter-pill on" style={{"--c":"#22c55e"}} onClick={() => applyPreset("60_40")}>60/40</button>
+            <button
+              className="filter-pill on"
+              style={{"--c":"#22c55e"}}
+              onClick={() => applyPreset("60_40")}
+              disabled={!etfs.find((e) => e.ticker === "SPY") || !etfs.find((e) => e.ticker === "TLT")}
+            >
+              60/40
+            </button>
             <button className="filter-pill" style={{"--c":"#8fb8d8"}} onClick={() => applyPreset("equal")}>EQUAL</button>
             <button className="filter-pill" style={{"--c":"#f59e0b"}} onClick={() => applyPreset("mincorr")}>MIN-CORR</button>
           </div>
 
-          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0",marginBottom:"10px"}}>SELECT ETFs (PORTFOLIO):</div>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0",marginBottom:"10px"}}>SELECT ASSETS (PORTFOLIO):</div>
           <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"16px"}}>
             {etfs.map((e) => {
               const on = tickers.includes(e.ticker);
@@ -284,7 +332,7 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
                 <React.Fragment key={t}>
                   <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
                     <div style={{fontFamily:"'Syne Mono',monospace",fontWeight:700,color:meta?.color || "#8fb8d8"}}>{t}</div>
-                    <div style={{fontSize:"11px",color:"#3a5a75",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{meta?.sector || ""}</div>
+                    <div style={{fontSize:"11px",color:"#3a5a75",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{meta?.sector || meta?.region || ""}</div>
                   </div>
                   <input
                     value={weightsPct?.[t] ?? 0}
@@ -414,9 +462,14 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
             >
               EXPORT CSV
             </button>
-            <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#3a5a75"}}>Benchmark: SPY</div>
+            <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#3a5a75"}}>Benchmark: {benchmarkTicker || "NONE"}</div>
             <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#3a5a75"}}>Common bars: {dateBounds.count || 0}</div>
           </div>
+          {helperNote ? (
+            <div style={{marginTop:"10px",fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#4a6a85"}}>
+              {helperNote}
+            </div>
+          ) : null}
 
           {status && (
             <div style={{marginTop:"12px",fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#f97316"}}>
@@ -436,7 +489,7 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
                   ["Max Drawdown", formatPct(result.metrics.maxDrawdown)],
                   ["Sharpe", result.metrics.sharpe.toFixed(2)],
                   ["Sortino", result.metrics.sortino.toFixed(2)],
-                  ["SPY Return", result.metrics.benchmarkTotalReturn == null ? "N/A" : formatPct(result.metrics.benchmarkTotalReturn)],
+                  [`${benchmarkTicker || "Benchmark"} Return`, result.metrics.benchmarkTotalReturn == null ? "N/A" : formatPct(result.metrics.benchmarkTotalReturn)],
                 ].map(([k, v]) => (
                   <div key={k} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px",padding:"12px 14px"}}>
                     <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#1e3a55",letterSpacing:".1em",marginBottom:"6px"}}>{k}</div>
@@ -451,7 +504,7 @@ export default function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
 
           <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",marginBottom:"10px",flexWrap:"wrap"}}>
-              <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em"}}>EQUITY CURVE (PORTFOLIO VS SPY)</div>
+              <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em"}}>{`EQUITY CURVE (PORTFOLIO VS ${benchmarkTicker || "BENCHMARK"})`}</div>
               <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#3a5a75"}}>
                 {result?.metrics ? `${result.metrics.startDate} → ${result.metrics.endDate} · ${result.metrics.nDays} bars` : ""}
               </div>

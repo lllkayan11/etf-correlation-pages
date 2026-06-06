@@ -1,5 +1,5 @@
 // etf-correlation-dashboard.jsx
-import React2, { useEffect as useEffect2, useState as useState2, useMemo as useMemo2 } from "react";
+import React3, { useEffect as useEffect3, useState as useState3, useMemo as useMemo3 } from "react";
 
 // backtest-panel.jsx
 import React, { useEffect, useMemo, useState } from "react";
@@ -37,6 +37,29 @@ var computeMinCorrWeights = (tickers, corrMatrix, etfs) => {
   }
   return normalizeWeights(raw);
 };
+var computeMinCorrWeightsFromLookup = (tickers, corrLookup) => {
+  if (!tickers.length)
+    return {};
+  const raw = {};
+  for (let i = 0; i < tickers.length; i++) {
+    const tI = tickers[i];
+    let s = 0;
+    let c = 0;
+    for (let j = 0; j < tickers.length; j++) {
+      if (i === j)
+        continue;
+      const tJ = tickers[j];
+      const v = corrLookup?.[tI]?.[tJ];
+      if (typeof v === "number" && Number.isFinite(v)) {
+        s += v;
+        c += 1;
+      }
+    }
+    const avg = c ? s / c : 0;
+    raw[tI] = clamp(1 - avg, 1e-3, 10);
+  }
+  return normalizeWeights(raw);
+};
 var alignAdjCloseSeries = (ohlcByTicker, tickers, startDate, endDate) => {
   const mapByTicker = {};
   for (const t of tickers) {
@@ -64,6 +87,62 @@ var alignAdjCloseSeries = (ohlcByTicker, tickers, startDate, endDate) => {
     prices[t] = commonDates.map((d) => m.get(d));
   }
   return { dates: commonDates, prices };
+};
+var mean = (arr) => arr.reduce((a, b) => a + b, 0) / Math.max(1, arr.length);
+var pearsonCorr = (a, b) => {
+  const n = Math.min(a.length, b.length);
+  if (n < 2)
+    return null;
+  const ma = mean(a);
+  const mb = mean(b);
+  let cov = 0;
+  let va = 0;
+  let vb = 0;
+  for (let i = 0; i < n; i++) {
+    const da = a[i] - ma;
+    const db = b[i] - mb;
+    cov += da * db;
+    va += da * da;
+    vb += db * db;
+  }
+  if (va <= 0 || vb <= 0)
+    return null;
+  return cov / Math.sqrt(va * vb);
+};
+var computeCorrelationLookupFromOhlc = (ohlcByTicker, tickers, startDate, endDate) => {
+  const names = Array.from(new Set((tickers || []).filter(Boolean)));
+  if (!names.length) {
+    return { tickers: [], dates: [], matrix: [], lookup: {}, aligned: { dates: [], prices: {} } };
+  }
+  const aligned = alignAdjCloseSeries(ohlcByTicker, names, startDate, endDate);
+  const returnsByTicker = {};
+  for (const t of names) {
+    const prices = aligned.prices?.[t] || [];
+    const vals = [];
+    for (let i = 1; i < prices.length; i++) {
+      const prev = Number(prices[i - 1]);
+      const curr = Number(prices[i]);
+      if (!Number.isFinite(prev) || !Number.isFinite(curr) || prev <= 0 || curr <= 0)
+        continue;
+      vals.push(curr / prev - 1);
+    }
+    returnsByTicker[t] = vals;
+  }
+  const lookup = {};
+  const matrix = names.map((rowTicker, rowIdx) => {
+    lookup[rowTicker] = lookup[rowTicker] || {};
+    return names.map((colTicker, colIdx) => {
+      if (rowIdx === colIdx) {
+        lookup[rowTicker][colTicker] = 1;
+        return 1;
+      }
+      const v = pearsonCorr(returnsByTicker[rowTicker] || [], returnsByTicker[colTicker] || []);
+      const next = v == null ? 0 : v;
+      lookup[rowTicker][colTicker] = next;
+      return next;
+    });
+  });
+  return { tickers: names, dates: aligned.dates.slice(1), matrix, lookup, aligned };
 };
 var rebalanceKey = (dateStr, freq) => {
   const y = dateStr.slice(0, 4);
@@ -189,15 +268,15 @@ var computeMetrics = ({ equity, returns, benchmarkReturns, riskFreeRateAnnual })
   }
   const rf = (Number(riskFreeRateAnnual) || 0) / 252;
   const ex = returns.map((r) => r - rf);
-  const mean = ex.reduce((a, b) => a + b, 0) / Math.max(1, ex.length);
-  const variance = ex.reduce((a, r) => a + (r - mean) * (r - mean), 0) / Math.max(1, ex.length - 1);
+  const mean2 = ex.reduce((a, b) => a + b, 0) / Math.max(1, ex.length);
+  const variance = ex.reduce((a, r) => a + (r - mean2) * (r - mean2), 0) / Math.max(1, ex.length - 1);
   const vol = Math.sqrt(Math.max(0, variance));
-  const sharpe = vol > 0 ? mean / vol * Math.sqrt(252) : 0;
+  const sharpe = vol > 0 ? mean2 / vol * Math.sqrt(252) : 0;
   const downside = ex.filter((r) => r < 0);
   const dMean = downside.reduce((a, b) => a + b, 0) / Math.max(1, downside.length);
   const dVar = downside.reduce((a, r) => a + (r - dMean) * (r - dMean), 0) / Math.max(1, downside.length - 1);
   const dVol = Math.sqrt(Math.max(0, dVar));
-  const sortino = dVol > 0 ? mean / dVol * Math.sqrt(252) : 0;
+  const sortino = dVol > 0 ? mean2 / dVol * Math.sqrt(252) : 0;
   const benchTotal = equity[0]?.benchmark != null && equity[equity.length - 1]?.benchmark != null ? equity[equity.length - 1].benchmark / equity[0].benchmark - 1 : null;
   return {
     totalReturn,
@@ -355,9 +434,35 @@ var EquityCurveChart = ({ equity }) => {
     style: { display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "8px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0" }
   }, /* @__PURE__ */ React.createElement("div", null, hovered.date), /* @__PURE__ */ React.createElement("div", null, "PORT ", formatMoney(hovered.portfolio), hovered.benchmark != null ? ` \xB7 SPY ${formatMoney(hovered.benchmark)}` : "")));
 };
-function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
-  const [tickers, setTickers] = useState(["SPY", "TLT"]);
-  const [weightsPct, setWeightsPct] = useState({ SPY: 60, TLT: 40 });
+var deriveDefaultTickers = (assets, preferred) => {
+  const all = (assets || []).map((item) => item.ticker);
+  const preferredValid = (preferred || []).filter((ticker) => all.includes(ticker));
+  if (preferredValid.length)
+    return preferredValid;
+  if (all.includes("SPY") && all.includes("TLT"))
+    return ["SPY", "TLT"];
+  return all.slice(0, Math.min(3, all.length));
+};
+function BacktestPanel({
+  etfs,
+  corrMatrix,
+  corrLookup,
+  ohlcData,
+  benchmarkTicker = "SPY",
+  defaultTickers,
+  title = "Portfolio Backtest (Rebalance + Benchmark)",
+  description = "",
+  helperNote = ""
+}) {
+  const [tickers, setTickers] = useState(() => deriveDefaultTickers(etfs, defaultTickers));
+  const [weightsPct, setWeightsPct] = useState(() => {
+    const initial = deriveDefaultTickers(etfs, defaultTickers);
+    if (initial.length === 2 && initial.includes("SPY") && initial.includes("TLT")) {
+      return { SPY: 60, TLT: 40 };
+    }
+    const eq = initial.length ? 100 / initial.length : 0;
+    return Object.fromEntries(initial.map((ticker) => [ticker, eq]));
+  });
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [initialCapital, setInitialCapital] = useState(1e5);
@@ -367,8 +472,18 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
   const [riskFree, setRiskFree] = useState(0);
   const [result, setResult] = useState(null);
   const [status, setStatus] = useState("");
+  useEffect(() => {
+    const available = new Set((etfs || []).map((item) => item.ticker));
+    const nextDefault = deriveDefaultTickers(etfs, defaultTickers);
+    setTickers((prev) => {
+      const filtered = prev.filter((ticker) => available.has(ticker));
+      if (filtered.length)
+        return filtered;
+      return nextDefault;
+    });
+  }, [defaultTickers, etfs]);
   const dateBounds = useMemo(() => {
-    const tickersForAlign = Array.from(new Set([...tickers, "SPY"]));
+    const tickersForAlign = Array.from(new Set([...tickers, benchmarkTicker].filter(Boolean)));
     if (!tickers.length || !tickersForAlign.every((t) => (ohlcData?.[t] || []).length)) {
       return { start: "", end: "", count: 0 };
     }
@@ -436,7 +551,7 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
       return;
     }
     if (preset === "mincorr") {
-      const wDec = computeMinCorrWeights(tickers, corrMatrix, etfs);
+      const wDec = corrLookup ? computeMinCorrWeightsFromLookup(tickers, corrLookup) : computeMinCorrWeights(tickers, corrMatrix, etfs);
       const wPct = {};
       for (const t of tickers)
         wPct[t] = (wDec[t] || 0) * 100;
@@ -446,9 +561,9 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
   const run = () => {
     setStatus("");
     setResult(null);
-    const tickersForAlign = Array.from(new Set([...tickers, "SPY"]));
+    const tickersForAlign = Array.from(new Set([...tickers, benchmarkTicker].filter(Boolean)));
     if (!tickers.length) {
-      setStatus("Please select at least 1 ETF.");
+      setStatus("Please select at least 1 asset.");
       return;
     }
     if (!tickersForAlign.every((t) => (ohlcData?.[t] || []).length)) {
@@ -486,7 +601,7 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
       initialCapital,
       weightsByTicker: w,
       rebalanceFreq: rebalance,
-      benchmarkTicker: "SPY",
+      benchmarkTicker,
       feeBps,
       slippageBps,
       riskFreeRateAnnual: (Number(riskFree) || 0) / 100
@@ -504,13 +619,16 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
   }, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "BACKTEST SYSTEM"), /* @__PURE__ */ React.createElement("div", {
-    style: { fontWeight: 800, fontSize: "18px", color: "#f0f6ff", marginBottom: "14px" }
-  }, "Portfolio Backtest (Rebalance + Benchmark)"), /* @__PURE__ */ React.createElement("div", {
+    style: { fontWeight: 800, fontSize: "18px", color: "#f0f6ff", marginBottom: description ? "8px" : "14px" }
+  }, title), description ? /* @__PURE__ */ React.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7, marginBottom: "14px" }
+  }, description) : null, /* @__PURE__ */ React.createElement("div", {
     style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px" }
   }, /* @__PURE__ */ React.createElement("button", {
     className: "filter-pill on",
     style: { "--c": "#22c55e" },
-    onClick: () => applyPreset("60_40")
+    onClick: () => applyPreset("60_40"),
+    disabled: !etfs.find((e) => e.ticker === "SPY") || !etfs.find((e) => e.ticker === "TLT")
   }, "60/40"), /* @__PURE__ */ React.createElement("button", {
     className: "filter-pill",
     style: { "--c": "#8fb8d8" },
@@ -521,7 +639,7 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
     onClick: () => applyPreset("mincorr")
   }, "MIN-CORR")), /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "10px" }
-  }, "SELECT ETFs (PORTFOLIO):"), /* @__PURE__ */ React.createElement("div", {
+  }, "SELECT ASSETS (PORTFOLIO):"), /* @__PURE__ */ React.createElement("div", {
     style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }
   }, etfs.map((e) => {
     const on = tickers.includes(e.ticker);
@@ -543,7 +661,7 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
       style: { fontFamily: "'Syne Mono',monospace", fontWeight: 700, color: meta?.color || "#8fb8d8" }
     }, t), /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: "11px", color: "#3a5a75", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
-    }, meta?.sector || "")), /* @__PURE__ */ React.createElement("input", {
+    }, meta?.sector || meta?.region || "")), /* @__PURE__ */ React.createElement("input", {
       value: weightsPct?.[t] ?? 0,
       type: "number",
       step: "0.1",
@@ -652,9 +770,11 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
     disabled: !result?.equity?.length
   }, "EXPORT CSV"), /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
-  }, "Benchmark: SPY"), /* @__PURE__ */ React.createElement("div", {
+  }, "Benchmark: ", benchmarkTicker || "NONE"), /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
-  }, "Common bars: ", dateBounds.count || 0)), status && /* @__PURE__ */ React.createElement("div", {
+  }, "Common bars: ", dateBounds.count || 0)), helperNote ? /* @__PURE__ */ React.createElement("div", {
+    style: { marginTop: "10px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#4a6a85" }
+  }, helperNote) : null, status && /* @__PURE__ */ React.createElement("div", {
     style: { marginTop: "12px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#f97316" }
   }, status)), /* @__PURE__ */ React.createElement("div", {
     style: { flex: 1.3, minWidth: "360px" }
@@ -670,7 +790,7 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
     ["Max Drawdown", formatPct(result.metrics.maxDrawdown)],
     ["Sharpe", result.metrics.sharpe.toFixed(2)],
     ["Sortino", result.metrics.sortino.toFixed(2)],
-    ["SPY Return", result.metrics.benchmarkTotalReturn == null ? "N/A" : formatPct(result.metrics.benchmarkTotalReturn)]
+    [`${benchmarkTicker || "Benchmark"} Return`, result.metrics.benchmarkTotalReturn == null ? "N/A" : formatPct(result.metrics.benchmarkTotalReturn)]
   ].map(([k, v]) => /* @__PURE__ */ React.createElement("div", {
     key: k,
     style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
@@ -686,13 +806,343 @@ function BacktestPanel({ etfs, corrMatrix, ohlcData }) {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }
   }, /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em" }
-  }, "EQUITY CURVE (PORTFOLIO VS SPY)"), /* @__PURE__ */ React.createElement("div", {
+  }, `EQUITY CURVE (PORTFOLIO VS ${benchmarkTicker || "BENCHMARK"})`), /* @__PURE__ */ React.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
   }, result?.metrics ? `${result.metrics.startDate} \u2192 ${result.metrics.endDate} \xB7 ${result.metrics.nDays} bars` : "")), /* @__PURE__ */ React.createElement(EquityCurveChart, {
     equity: result?.equity || []
   }), /* @__PURE__ */ React.createElement("div", {
     style: { marginTop: "10px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
   }, "Weights: ", tickers.map((t) => `${t} ${(weightsDec[t] * 100).toFixed(1)}%`).join(" \xB7 "))))));
+}
+
+// market-lab-panel.jsx
+import React2, { useEffect as useEffect2, useMemo as useMemo2, useState as useState2 } from "react";
+
+// yahoo-bridge-client.js
+var getPreferredBase = () => {
+  if (typeof window === "undefined")
+    return "http://127.0.0.1:8765";
+  const { hostname, port } = window.location;
+  if ((hostname === "127.0.0.1" || hostname === "localhost") && port === "8765") {
+    return "";
+  }
+  return "http://127.0.0.1:8765";
+};
+var requestJson = async (path) => {
+  const res = await fetch(`${getPreferredBase()}${path}`, {
+    cache: "no-store"
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || payload?.ok === false) {
+    throw new Error(payload?.message || `Request failed: ${res.status}`);
+  }
+  return payload;
+};
+var probeYahooBridge = () => requestJson("/api/health");
+var searchYahooSymbols = (query, limit = 8) => requestJson(`/api/search?query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+var fetchYahooHistory = (symbol, period = "10y") => requestJson(`/api/history?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}`);
+
+// market-lab-panel.jsx
+var corrColor = (v) => {
+  if (v >= 0.7)
+    return "#f97316";
+  if (v >= 0.3)
+    return "#eab308";
+  if (v >= 0)
+    return "#22c55e";
+  return "#3b82f6";
+};
+var corrBg = (v) => {
+  if (v >= 0.7)
+    return "rgba(249,115,22,.14)";
+  if (v >= 0.3)
+    return "rgba(234,179,8,.14)";
+  if (v >= 0)
+    return "rgba(34,197,94,.12)";
+  return "rgba(59,130,246,.14)";
+};
+var colorFromTicker = (ticker) => {
+  const palette = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#14b8a6", "#a855f7", "#f97316", "#06b6d4"];
+  const code = (ticker || "").split("").reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  return palette[code % palette.length];
+};
+var assetFromQuote = (quote, baseMap) => {
+  const symbol = (quote?.symbol || "").toUpperCase();
+  return baseMap?.[symbol] || {
+    ticker: symbol,
+    name: quote?.longname || quote?.shortname || symbol,
+    region: quote?.exchDisp || quote?.exchange || "Yahoo",
+    sector: quote?.typeDisp || quote?.quoteType || "Yahoo Asset",
+    corr_group: quote?.typeDisp || quote?.quoteType || "CUSTOM",
+    why_short: "Loaded from Yahoo local bridge.",
+    why_full: "This asset was imported dynamically from Yahoo-compatible symbol search.",
+    color: colorFromTicker(symbol),
+    isCustom: true
+  };
+};
+var describeCorr = (v) => {
+  if (v >= 0.7)
+    return "High positive linkage. These assets have tended to move together strongly.";
+  if (v >= 0.3)
+    return "Moderate positive linkage. They share some common risk drivers but still diversify partially.";
+  if (v >= 0)
+    return "Low positive linkage. Diversification benefit is meaningful.";
+  return "Negative linkage. This pair has historically offset each other during parts of the sample.";
+};
+function MarketLabPanel({ baseAssets, baseOhlcData }) {
+  const baseAssetMap = useMemo2(() => Object.fromEntries((baseAssets || []).map((asset) => [asset.ticker, asset])), [baseAssets]);
+  const [bridgeReady, setBridgeReady] = useState2(false);
+  const [bridgeMessage, setBridgeMessage] = useState2("Checking local Yahoo bridge...");
+  const [query, setQuery] = useState2("");
+  const [searchBusy, setSearchBusy] = useState2(false);
+  const [searchResults, setSearchResults] = useState2([]);
+  const [selectedPair, setSelectedPair] = useState2(null);
+  const [status, setStatus] = useState2("");
+  const [importingSymbol, setImportingSymbol] = useState2("");
+  const [assetMap, setAssetMap] = useState2(() => baseAssetMap);
+  const [extraOhlc, setExtraOhlc] = useState2({});
+  const [universeTickers, setUniverseTickers] = useState2(["SPY", "TLT", "GLD"]);
+  useEffect2(() => {
+    setAssetMap((prev) => ({ ...baseAssetMap, ...prev }));
+  }, [baseAssetMap]);
+  useEffect2(() => {
+    let active = true;
+    probeYahooBridge().then(() => {
+      if (!active)
+        return;
+      setBridgeReady(true);
+      setBridgeMessage("Local Yahoo bridge is online. You can search and import any Yahoo symbol.");
+    }).catch(() => {
+      if (!active)
+        return;
+      setBridgeReady(false);
+      setBridgeMessage("Start local_refresh_server.py and open http://127.0.0.1:8765/ to enable full-universe Yahoo search.");
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect2(() => {
+    if (!bridgeReady || query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      setSearchBusy(true);
+      searchYahooSymbols(query.trim(), 8).then((payload) => {
+        if (!active)
+          return;
+        setSearchResults(payload?.results || []);
+      }).catch(() => {
+        if (!active)
+          return;
+        setSearchResults([]);
+      }).finally(() => {
+        if (active)
+          setSearchBusy(false);
+      });
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [bridgeReady, query]);
+  const ohlcData = useMemo2(() => ({ ...baseOhlcData || {}, ...extraOhlc }), [baseOhlcData, extraOhlc]);
+  const availableTickers = useMemo2(() => universeTickers.filter((ticker) => Array.isArray(ohlcData?.[ticker]) && ohlcData[ticker].length), [ohlcData, universeTickers]);
+  const universeAssets = useMemo2(() => availableTickers.map((ticker) => assetMap[ticker]).filter(Boolean), [assetMap, availableTickers]);
+  const corrData = useMemo2(() => computeCorrelationLookupFromOhlc(ohlcData, availableTickers), [ohlcData, availableTickers]);
+  const importSymbol = async (symbol, quote) => {
+    const nextSymbol = (symbol || "").trim().toUpperCase();
+    if (!nextSymbol)
+      return;
+    setStatus("");
+    if (ohlcData?.[nextSymbol]?.length) {
+      setUniverseTickers((prev) => prev.includes(nextSymbol) ? prev : [...prev, nextSymbol]);
+      setQuery("");
+      return;
+    }
+    try {
+      setImportingSymbol(nextSymbol);
+      const payload = await fetchYahooHistory(nextSymbol, "10y");
+      const asset = assetFromQuote({
+        symbol: nextSymbol,
+        longname: payload?.meta?.name || quote?.longname,
+        shortname: payload?.meta?.shortName || quote?.shortname,
+        exchange: payload?.meta?.exchange || quote?.exchange,
+        exchDisp: payload?.meta?.exchange || quote?.exchDisp,
+        quoteType: payload?.meta?.quoteType || quote?.quoteType,
+        typeDisp: quote?.typeDisp || payload?.meta?.quoteType
+      }, baseAssetMap);
+      setAssetMap((prev) => ({ ...prev, [nextSymbol]: asset }));
+      setExtraOhlc((prev) => ({ ...prev, [nextSymbol]: payload?.ohlc || [] }));
+      setUniverseTickers((prev) => prev.includes(nextSymbol) ? prev : [...prev, nextSymbol]);
+      setQuery("");
+      setSearchResults([]);
+      setStatus(`${nextSymbol} imported from Yahoo history.`);
+    } catch (error) {
+      setStatus(error?.message || `Failed to import ${nextSymbol}.`);
+    } finally {
+      setImportingSymbol("");
+    }
+  };
+  const removeTicker = (ticker) => {
+    if (universeTickers.length <= 2)
+      return;
+    setUniverseTickers((prev) => prev.filter((item) => item !== ticker));
+    setSelectedPair(null);
+  };
+  return /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: "16px", alignItems: "stretch", marginBottom: "18px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
+  }, "FULL UNIVERSE MODE"), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontWeight: 800, fontSize: "18px", color: "#f0f6ff", marginBottom: "8px" }
+  }, "Yahoo Search + Dynamic Correlation + Portfolio Backtest"), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7, marginBottom: "14px" }
+  }, "Search any Yahoo-compatible stock, ETF, ADR or international symbol, import its daily history, then run correlation analysis and backtests in the same workspace."), /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "14px" }
+  }, /* @__PURE__ */ React2.createElement("input", {
+    value: query,
+    placeholder: "Search Apple / Tesla / 0700.HK / TSM / BTC-USD",
+    style: { flex: 1, minWidth: "260px", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "10px 12px", color: "#d1d9e6", fontFamily: "Syne Mono", fontSize: "11px" },
+    onChange: (e) => setQuery(e.target.value),
+    onKeyDown: (e) => {
+      if (e.key === "Enter") {
+        importSymbol(query, null);
+      }
+    }
+  }), /* @__PURE__ */ React2.createElement("button", {
+    className: "nav-tab on",
+    onClick: () => importSymbol(query, null),
+    disabled: !bridgeReady || !query.trim() || !!importingSymbol,
+    style: { background: "#0e2540", borderColor: "#143a61", color: "#8fb8d8" }
+  }, importingSymbol ? `IMPORTING ${importingSymbol}...` : "ADD SYMBOL")), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: bridgeReady ? "#22c55e" : "#f59e0b", marginBottom: "8px" }
+  }, bridgeMessage), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
+  }, "Best execution path: run the app via `python3 local_refresh_server.py`, then open `http://127.0.0.1:8765/`."), status && /* @__PURE__ */ React2.createElement("div", {
+    style: { marginTop: "12px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fb8d8" }
+  }, status)), /* @__PURE__ */ React2.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "10px" }
+  }, "UNIVERSE STATUS"), /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10px" }
+  }, [
+    ["Loaded Assets", String(availableTickers.length)],
+    ["Common Bars", String(corrData.dates.length || 0)],
+    ["Search Mode", bridgeReady ? "ONLINE" : "OFFLINE"],
+    ["Benchmark", "SPY"]
+  ].map(([label, value]) => /* @__PURE__ */ React2.createElement("div", {
+    key: label,
+    style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
+  }, label), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "14px", fontWeight: 700, color: "#d1d9e6" }
+  }, value)))))), (searchBusy || searchResults.length > 0) && /* @__PURE__ */ React2.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "16px 18px", marginBottom: "18px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "12px" }
+  }, searchBusy ? "SEARCHING YAHOO..." : "SEARCH RESULTS"), /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "10px" }
+  }, searchResults.map((item) => {
+    const symbol = item.symbol;
+    const imported = !!ohlcData?.[symbol]?.length;
+    return /* @__PURE__ */ React2.createElement("div", {
+      key: symbol,
+      style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
+    }, /* @__PURE__ */ React2.createElement("div", {
+      style: { display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginBottom: "6px" }
+    }, /* @__PURE__ */ React2.createElement("div", {
+      style: { fontFamily: "'Syne Mono',monospace", fontSize: "13px", fontWeight: 700, color: colorFromTicker(symbol) }
+    }, symbol), /* @__PURE__ */ React2.createElement("button", {
+      className: "filter-pill",
+      onClick: () => importSymbol(symbol, item),
+      disabled: !!importingSymbol
+    }, imported ? "ADDED" : "IMPORT")), /* @__PURE__ */ React2.createElement("div", {
+      style: { fontSize: "12px", color: "#d1d9e6", marginBottom: "5px" }
+    }, item.longname || item.shortname || symbol), /* @__PURE__ */ React2.createElement("div", {
+      style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#3a5a75" }
+    }, (item.typeDisp || item.quoteType || "Yahoo").toUpperCase(), " \xB7 ", item.exchDisp || item.exchange || "Yahoo"));
+  }))), /* @__PURE__ */ React2.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "18px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "12px" }
+  }, "ACTIVE UNIVERSE"), /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "flex", gap: "8px", flexWrap: "wrap" }
+  }, universeTickers.map((ticker) => {
+    const asset = assetMap[ticker];
+    const removable = universeTickers.length > 2;
+    return /* @__PURE__ */ React2.createElement("button", {
+      key: ticker,
+      className: "filter-pill on",
+      style: { "--c": asset?.color || colorFromTicker(ticker), display: "flex", alignItems: "center", gap: "8px" },
+      onClick: () => removeTicker(ticker),
+      title: removable ? "Click to remove from dynamic universe" : ""
+    }, /* @__PURE__ */ React2.createElement("span", null, ticker), removable ? /* @__PURE__ */ React2.createElement("span", {
+      style: { opacity: 0.7 }
+    }, "\xD7") : null);
+  }))), /* @__PURE__ */ React2.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "18px", overflowX: "auto" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em" }
+  }, "DYNAMIC CORRELATION MATRIX \u2014 DAILY ADJ CLOSE RETURN BASIS"), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
+  }, corrData.dates.length ? `${corrData.dates[0]} \u2192 ${corrData.dates[corrData.dates.length - 1]} \xB7 ${corrData.dates.length} return bars` : "Need at least 2 loaded assets")), availableTickers.length >= 2 ? /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: `80px repeat(${availableTickers.length},1fr)`, gap: "3px", minWidth: `${80 + availableTickers.length * 72}px` }
+  }, /* @__PURE__ */ React2.createElement("div", null), availableTickers.map((ticker) => /* @__PURE__ */ React2.createElement("div", {
+    key: `${ticker}-col`,
+    style: { textAlign: "center", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: assetMap[ticker]?.color || "#8fb8d8", padding: "4px 2px" }
+  }, ticker)), availableTickers.map((rowTicker) => /* @__PURE__ */ React2.createElement(React2.Fragment, {
+    key: `${rowTicker}-row`
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "flex", alignItems: "center", paddingRight: "8px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: assetMap[rowTicker]?.color || "#8fb8d8" }
+  }, rowTicker), availableTickers.map((colTicker) => {
+    const same = rowTicker === colTicker;
+    const value = same ? 1 : corrData.lookup?.[rowTicker]?.[colTicker] ?? 0;
+    return /* @__PURE__ */ React2.createElement("div", {
+      key: `${rowTicker}-${colTicker}`,
+      className: "corr-cell",
+      style: {
+        height: "42px",
+        background: same ? "#0a1e32" : corrBg(value),
+        color: same ? "#1e3a55" : corrColor(value),
+        border: same ? "1px solid #0a1e32" : `1px solid ${corrColor(value)}33`
+      },
+      onClick: () => {
+        if (same)
+          return;
+        setSelectedPair({
+          a: assetMap[rowTicker],
+          b: assetMap[colTicker],
+          corr: value
+        });
+      }
+    }, same ? "\u2014" : value.toFixed(2));
+  })))) : /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#4a6a85" }
+  }, "Import at least 2 Yahoo symbols to generate a dynamic correlation matrix."), selectedPair && /* @__PURE__ */ React2.createElement("div", {
+    style: { marginTop: "16px", padding: "16px 18px", background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#8fb8d8", marginBottom: "6px" }
+  }, selectedPair.a?.ticker, " \xD7 ", selectedPair.b?.ticker, ": ", selectedPair.corr.toFixed(2)), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7 }
+  }, describeCorr(selectedPair.corr)))), /* @__PURE__ */ React2.createElement(BacktestPanel, {
+    etfs: universeAssets,
+    corrLookup: corrData.lookup,
+    ohlcData,
+    benchmarkTicker: "SPY",
+    defaultTickers: availableTickers,
+    title: "Global Yahoo Portfolio Backtest",
+    description: "Run portfolio backtests on any imported Yahoo-compatible assets.",
+    helperNote: "Search and import assets above. SPY remains the default benchmark."
+  }));
 }
 
 // etf-correlation-dashboard.jsx
@@ -5472,7 +5922,7 @@ var CORR_MATRIX = [
     1
   ]
 ];
-var corrColor = (v) => {
+var corrColor2 = (v) => {
   if (v >= 0.9)
     return "#dc2626";
   if (v >= 0.7)
@@ -5487,7 +5937,7 @@ var corrColor = (v) => {
     return "#06b6d4";
   return "#3b82f6";
 };
-var corrBg = (v) => {
+var corrBg2 = (v) => {
   if (v >= 0.9)
     return "rgba(220,38,38,0.25)";
   if (v >= 0.7)
@@ -5609,15 +6059,15 @@ var calcRSI = (rows, period = 14) => {
   return out;
 };
 var CandlestickChart = ({ data }) => {
-  const [hoverIdx, setHoverIdx] = useState2(null);
+  const [hoverIdx, setHoverIdx] = useState3(null);
   if (!data?.length) {
-    return /* @__PURE__ */ React2.createElement("div", {
+    return /* @__PURE__ */ React3.createElement("div", {
       style: { height: "380px", display: "grid", placeItems: "center", color: "#4a6a85", fontFamily: "'Syne Mono',monospace" }
     }, "NO OHLC DATA");
   }
-  const ma5 = useMemo2(() => calcMA(data, 5), [data]);
-  const ma20 = useMemo2(() => calcMA(data, 20), [data]);
-  const rsi14 = useMemo2(() => calcRSI(data, 14), [data]);
+  const ma5 = useMemo3(() => calcMA(data, 5), [data]);
+  const ma20 = useMemo3(() => calcMA(data, 20), [data]);
+  const rsi14 = useMemo3(() => calcRSI(data, 14), [data]);
   const W = 1100;
   const H = 452;
   const left = 56;
@@ -5657,7 +6107,7 @@ var CandlestickChart = ({ data }) => {
   const hoveredMa5 = hoverIdx != null ? ma5[hoverIdx] : null;
   const hoveredMa20 = hoverIdx != null ? ma20[hoverIdx] : null;
   const hoveredRsi = hoverIdx != null ? rsi14[hoverIdx] : null;
-  return /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("svg", {
+  return /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("svg", {
     width: "100%",
     height: H,
     viewBox: `0 0 ${W} ${H}`,
@@ -5674,16 +6124,16 @@ var CandlestickChart = ({ data }) => {
   }, [0, 1, 2, 3, 4].map((i) => {
     const py = priceTop + i / 4 * (priceBottom - priceTop);
     const p = (maxPrice - i / 4 * span).toFixed(2);
-    return /* @__PURE__ */ React2.createElement("g", {
+    return /* @__PURE__ */ React3.createElement("g", {
       key: `pgrid-${i}`
-    }, /* @__PURE__ */ React2.createElement("line", {
+    }, /* @__PURE__ */ React3.createElement("line", {
       x1: left,
       y1: py,
       x2: W - right,
       y2: py,
       stroke: "#0a1a2e",
       strokeDasharray: "2 5"
-    }), /* @__PURE__ */ React2.createElement("text", {
+    }), /* @__PURE__ */ React3.createElement("text", {
       x: left - 6,
       y: py + 3,
       textAnchor: "end",
@@ -5694,15 +6144,15 @@ var CandlestickChart = ({ data }) => {
   }), [0, 1].map((i) => {
     const py = volumeTop + i / 1 * (volumeBottom - volumeTop);
     const p = i === 0 ? fmtVol(maxVol) : "0";
-    return /* @__PURE__ */ React2.createElement("g", {
+    return /* @__PURE__ */ React3.createElement("g", {
       key: `vgrid-${i}`
-    }, /* @__PURE__ */ React2.createElement("line", {
+    }, /* @__PURE__ */ React3.createElement("line", {
       x1: left,
       y1: py,
       x2: W - right,
       y2: py,
       stroke: "#0a1a2e"
-    }), /* @__PURE__ */ React2.createElement("text", {
+    }), /* @__PURE__ */ React3.createElement("text", {
       x: left - 6,
       y: py + 3,
       textAnchor: "end",
@@ -5712,16 +6162,16 @@ var CandlestickChart = ({ data }) => {
     }, p));
   }), [70, 50, 30].map((level) => {
     const py = yRsi(level);
-    return /* @__PURE__ */ React2.createElement("g", {
+    return /* @__PURE__ */ React3.createElement("g", {
       key: `rsi-${level}`
-    }, /* @__PURE__ */ React2.createElement("line", {
+    }, /* @__PURE__ */ React3.createElement("line", {
       x1: left,
       y1: py,
       x2: W - right,
       y2: py,
       stroke: level === 50 ? "#0a1a2e" : "#1f2937",
       strokeDasharray: "3 4"
-    }), /* @__PURE__ */ React2.createElement("text", {
+    }), /* @__PURE__ */ React3.createElement("text", {
       x: left - 6,
       y: py + 3,
       textAnchor: "end",
@@ -5729,17 +6179,17 @@ var CandlestickChart = ({ data }) => {
       fontSize: "9",
       fontFamily: "Syne Mono"
     }, level));
-  }), /* @__PURE__ */ React2.createElement("path", {
+  }), /* @__PURE__ */ React3.createElement("path", {
     d: maPath(ma5),
     fill: "none",
     stroke: "#f59e0b",
     strokeWidth: 1.2
-  }), /* @__PURE__ */ React2.createElement("path", {
+  }), /* @__PURE__ */ React3.createElement("path", {
     d: maPath(ma20),
     fill: "none",
     stroke: "#60a5fa",
     strokeWidth: 1.2
-  }), /* @__PURE__ */ React2.createElement("path", {
+  }), /* @__PURE__ */ React3.createElement("path", {
     d: rsi14.map((v, i) => v == null ? null : `${i === 0 || rsi14[i - 1] == null ? "M" : "L"} ${xOf(i)} ${yRsi(v)}`).filter(Boolean).join(" "),
     fill: "none",
     stroke: "#a78bfa",
@@ -5752,16 +6202,16 @@ var CandlestickChart = ({ data }) => {
     const yClose = yPrice(d.close);
     const bodyTop = Math.min(yOpen, yClose);
     const bodyHeight = Math.max(1, Math.abs(yOpen - yClose));
-    return /* @__PURE__ */ React2.createElement("g", {
+    return /* @__PURE__ */ React3.createElement("g", {
       key: d.date
-    }, /* @__PURE__ */ React2.createElement("line", {
+    }, /* @__PURE__ */ React3.createElement("line", {
       x1: x,
       x2: x,
       y1: yPrice(d.high),
       y2: yPrice(d.low),
       stroke: color,
       strokeWidth: 1
-    }), /* @__PURE__ */ React2.createElement("rect", {
+    }), /* @__PURE__ */ React3.createElement("rect", {
       x: x - bodyW / 2,
       y: bodyTop,
       width: bodyW,
@@ -5769,7 +6219,7 @@ var CandlestickChart = ({ data }) => {
       fill: up ? `${color}AA` : color,
       stroke: color,
       strokeWidth: 1
-    }), /* @__PURE__ */ React2.createElement("rect", {
+    }), /* @__PURE__ */ React3.createElement("rect", {
       x: x - bodyW / 2,
       y: yVol(d.volume),
       width: bodyW,
@@ -5777,14 +6227,14 @@ var CandlestickChart = ({ data }) => {
       fill: up ? "#14532d" : "#7f1d1d",
       opacity: 0.8
     }));
-  }), hovered && /* @__PURE__ */ React2.createElement("g", null, /* @__PURE__ */ React2.createElement("line", {
+  }), hovered && /* @__PURE__ */ React3.createElement("g", null, /* @__PURE__ */ React3.createElement("line", {
     x1: xOf(hoverIdx),
     x2: xOf(hoverIdx),
     y1: priceTop,
     y2: rsiBottom,
     stroke: "#38bdf8",
     strokeDasharray: "4 4"
-  }), /* @__PURE__ */ React2.createElement("line", {
+  }), /* @__PURE__ */ React3.createElement("line", {
     x1: left,
     x2: W - right,
     y1: yPrice(hovered.close),
@@ -5792,7 +6242,7 @@ var CandlestickChart = ({ data }) => {
     stroke: "#1d4ed8",
     strokeDasharray: "4 4",
     opacity: 0.7
-  }), hoveredRsi != null && /* @__PURE__ */ React2.createElement("line", {
+  }), hoveredRsi != null && /* @__PURE__ */ React3.createElement("line", {
     x1: left,
     x2: W - right,
     y1: yRsi(hoveredRsi),
@@ -5803,7 +6253,7 @@ var CandlestickChart = ({ data }) => {
   })), data.map((d, i) => {
     if (i % labelStep !== 0 && i !== data.length - 1)
       return null;
-    return /* @__PURE__ */ React2.createElement("text", {
+    return /* @__PURE__ */ React3.createElement("text", {
       key: `x-${d.date}`,
       x: xOf(i),
       y: axisBottom,
@@ -5812,32 +6262,32 @@ var CandlestickChart = ({ data }) => {
       fontSize: "9",
       fontFamily: "Syne Mono"
     }, d.date.slice(2));
-  })), /* @__PURE__ */ React2.createElement("div", {
+  })), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginTop: "8px", fontFamily: "'Syne Mono',monospace" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "10px", color: "#3a5a75" }
-  }, "MA5 ", /* @__PURE__ */ React2.createElement("span", {
+  }, "MA5 ", /* @__PURE__ */ React3.createElement("span", {
     style: { color: "#f59e0b" }
-  }, "\u25CF"), " \xA0 MA20 ", /* @__PURE__ */ React2.createElement("span", {
+  }, "\u25CF"), " \xA0 MA20 ", /* @__PURE__ */ React3.createElement("span", {
     style: { color: "#60a5fa" }
-  }, "\u25CF"), " \xA0 RSI14 ", /* @__PURE__ */ React2.createElement("span", {
+  }, "\u25CF"), " \xA0 RSI14 ", /* @__PURE__ */ React3.createElement("span", {
     style: { color: "#a78bfa" }
-  }, "\u25CF"), " \xA0 Volume bars in lower panel"), hovered && /* @__PURE__ */ React2.createElement("div", {
+  }, "\u25CF"), " \xA0 Volume bars in lower panel"), hovered && /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "10px", color: "#8fa8c0", textAlign: "right", lineHeight: 1.5 }
-  }, /* @__PURE__ */ React2.createElement("div", null, hovered.date), /* @__PURE__ */ React2.createElement("div", null, "O ", hovered.open.toFixed(2), " \xB7 H ", hovered.high.toFixed(2), " \xB7 L ", hovered.low.toFixed(2), " \xB7 C ", hovered.close.toFixed(2)), /* @__PURE__ */ React2.createElement("div", null, "Adj ", hovered.adjClose.toFixed(2), " \xB7 Vol ", fmtVol(hovered.volume), " \xB7 MA5 ", hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A", " \xB7 MA20 ", hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A", " \xB7 RSI14 ", hoveredRsi != null ? hoveredRsi.toFixed(2) : "N/A"))));
+  }, /* @__PURE__ */ React3.createElement("div", null, hovered.date), /* @__PURE__ */ React3.createElement("div", null, "O ", hovered.open.toFixed(2), " \xB7 H ", hovered.high.toFixed(2), " \xB7 L ", hovered.low.toFixed(2), " \xB7 C ", hovered.close.toFixed(2)), /* @__PURE__ */ React3.createElement("div", null, "Adj ", hovered.adjClose.toFixed(2), " \xB7 Vol ", fmtVol(hovered.volume), " \xB7 MA5 ", hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A", " \xB7 MA20 ", hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A", " \xB7 RSI14 ", hoveredRsi != null ? hoveredRsi.toFixed(2) : "N/A"))));
 };
 function App() {
-  const [tab, setTab] = useState2("matrix");
-  const [selected, setSelected] = useState2(ETFS[0]);
-  const [highlight, setHighlight] = useState2(null);
-  const [visibleETFs, setVisibleETFs] = useState2(ETFS.map((e) => e.id));
-  const [selectedPair, setSelectedPair] = useState2(null);
-  const [monthlyData, setMonthlyData] = useState2(YAHOO_MONTHLY_DATA);
-  const [corrMatrix, setCorrMatrix] = useState2(DEFAULT_CORR_MATRIX);
-  const [ohlcData, setOhlcData] = useState2({});
-  const [chartRange, setChartRange] = useState2("ALL");
-  const [isRefreshing, setIsRefreshing] = useState2(false);
-  const [refreshMessage, setRefreshMessage] = useState2("");
+  const [tab, setTab] = useState3("matrix");
+  const [selected, setSelected] = useState3(ETFS[0]);
+  const [highlight, setHighlight] = useState3(null);
+  const [visibleETFs, setVisibleETFs] = useState3(ETFS.map((e) => e.id));
+  const [selectedPair, setSelectedPair] = useState3(null);
+  const [monthlyData, setMonthlyData] = useState3(YAHOO_MONTHLY_DATA);
+  const [corrMatrix, setCorrMatrix] = useState3(DEFAULT_CORR_MATRIX);
+  const [ohlcData, setOhlcData] = useState3({});
+  const [chartRange, setChartRange] = useState3("ALL");
+  const [isRefreshing, setIsRefreshing] = useState3(false);
+  const [refreshMessage, setRefreshMessage] = useState3("");
   const loadLocalJsonData = async () => {
     const ts = Date.now();
     const [monthlyRes, corrRes, ohlcRes] = await Promise.all([
@@ -5875,14 +6325,14 @@ function App() {
       setIsRefreshing(false);
     }
   };
-  useEffect2(() => {
+  useEffect3(() => {
     loadLocalJsonData().catch(() => {
       setRefreshMessage("Using embedded fallback data.");
     });
   }, []);
-  const allData = useMemo2(() => ETFS.reduce((a, e) => ({ ...a, [e.ticker]: monthlyData[e.ticker] || generatePriceData(e) }), {}), [monthlyData]);
-  const priceData = useMemo2(() => allData[selected.ticker], [selected, allData]);
-  const dailyOhlcData = useMemo2(() => {
+  const allData = useMemo3(() => ETFS.reduce((a, e) => ({ ...a, [e.ticker]: monthlyData[e.ticker] || generatePriceData(e) }), {}), [monthlyData]);
+  const priceData = useMemo3(() => allData[selected.ticker], [selected, allData]);
+  const dailyOhlcData = useMemo3(() => {
     const rows = ohlcData[selected.ticker] || [];
     return filterOhlcByRange(rows, chartRange);
   }, [ohlcData, selected, chartRange]);
@@ -5890,19 +6340,19 @@ function App() {
   const lastP = dailyOhlcData[dailyOhlcData.length - 1]?.close ?? priceData[priceData.length - 1]?.price ?? 1;
   const totalRet = ((lastP - firstP) / firstP * 100).toFixed(1);
   const displayETFs = ETFS.filter((e) => visibleETFs.includes(e.id));
-  const avgCorr = useMemo2(() => {
+  const avgCorr = useMemo3(() => {
     const idx = selected.id;
     const row = corrMatrix[idx].filter((_, i) => i !== idx && visibleETFs.includes(i));
     if (row.length === 0)
       return "0.00";
     return (row.reduce((a, b) => a + b, 0) / row.length).toFixed(2);
   }, [selected, visibleETFs, corrMatrix]);
-  return /* @__PURE__ */ React2.createElement("div", {
+  return /* @__PURE__ */ React3.createElement("div", {
     style: { minHeight: "100vh", background: "#030810", color: "#d1d9e6", fontFamily: "'Syne',sans-serif" }
-  }, /* @__PURE__ */ React2.createElement("link", {
+  }, /* @__PURE__ */ React3.createElement("link", {
     href: "https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Syne+Mono&display=swap",
     rel: "stylesheet"
-  }), /* @__PURE__ */ React2.createElement("style", null, `
+  }), /* @__PURE__ */ React3.createElement("style", null, `
         *{box-sizing:border-box}
         ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#070f1c}::-webkit-scrollbar-thumb{background:#1a3050;border-radius:2px}
         .etf-pill{cursor:pointer;padding:7px 14px;border-radius:20px;border:1px solid #0e2035;background:transparent;font-family:'Syne Mono',monospace;font-size:11px;color:#3a5570;transition:all .15s;white-space:nowrap}
@@ -5918,77 +6368,77 @@ function App() {
         .filter-pill.on{background:#0e2540;border-color:var(--c);color:var(--c)}
         @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         .fade{animation:up .25s ease}
-      `), /* @__PURE__ */ React2.createElement("div", {
+      `), /* @__PURE__ */ React3.createElement("div", {
     style: { borderBottom: "1px solid #0a1a2e", padding: "16px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "rgba(3,8,16,.97)", zIndex: 20 }
-  }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
     style: { fontWeight: 800, fontSize: "20px", letterSpacing: ".02em", color: "#f0f6ff" }
-  }, "CORRELATION ANALYSIS DASHBOARD"), /* @__PURE__ */ React2.createElement("div", {
+  }, "CORRELATION ANALYSIS DASHBOARD"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e4060", marginTop: "2px", letterSpacing: ".08em" }
-  }, "10 GLOBALLY DIVERSIFIED ETFs \xB7 DAILY ADJ CLOSE DATA \xB7 2019\u20132026")), /* @__PURE__ */ React2.createElement("div", {
+  }, "10 GLOBALLY DIVERSIFIED ETFs \xB7 DAILY ADJ CLOSE DATA \xB7 2019\u20132026")), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "6px", alignItems: "center" }
-  }, /* @__PURE__ */ React2.createElement("button", {
+  }, /* @__PURE__ */ React3.createElement("button", {
     className: "nav-tab",
     onClick: handleRefreshData,
     disabled: isRefreshing,
     style: { color: isRefreshing ? "#4a6a85" : "#22c55e", borderColor: "#1b3b2a" },
     title: "Reload published JSON data from GitHub Pages."
-  }, isRefreshing ? "RELOADING..." : "RELOAD DATA"), [["matrix", "CORR MATRIX"], ["chart", "PRICE CHART"], ["backtest", "BACKTEST"], ["report", "SUPERVISOR REPORT"], ["sources", "DATA SOURCES"]].map(([v, l]) => /* @__PURE__ */ React2.createElement("button", {
+  }, isRefreshing ? "RELOADING..." : "RELOAD DATA"), [["matrix", "CORR MATRIX"], ["chart", "PRICE CHART"], ["backtest", "BACKTEST"], ["lab", "UNIVERSE LAB"], ["report", "SUPERVISOR REPORT"], ["sources", "DATA SOURCES"]].map(([v, l]) => /* @__PURE__ */ React3.createElement("button", {
     key: v,
     className: `nav-tab ${tab === v ? "on" : ""}`,
     onClick: () => setTab(v)
-  }, l)))), refreshMessage && /* @__PURE__ */ React2.createElement("div", {
+  }, l)))), refreshMessage && /* @__PURE__ */ React3.createElement("div", {
     style: { padding: "8px 28px", borderBottom: "1px solid #08172a", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0" }
-  }, refreshMessage), /* @__PURE__ */ React2.createElement("div", {
+  }, refreshMessage), /* @__PURE__ */ React3.createElement("div", {
     style: { padding: "14px 28px", borderBottom: "1px solid #08172a", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }
-  }, /* @__PURE__ */ React2.createElement("span", {
+  }, /* @__PURE__ */ React3.createElement("span", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", marginRight: "4px", letterSpacing: ".08em" }
-  }, "SELECT \u25B8"), ETFS.map((e) => /* @__PURE__ */ React2.createElement("button", {
+  }, "SELECT \u25B8"), ETFS.map((e) => /* @__PURE__ */ React3.createElement("button", {
     key: e.ticker,
     className: `etf-pill ${selected.ticker === e.ticker ? "on" : ""}`,
     style: { "--c": e.color },
     onClick: () => setSelected(e)
-  }, e.ticker, " ", /* @__PURE__ */ React2.createElement("span", {
+  }, e.ticker, " ", /* @__PURE__ */ React3.createElement("span", {
     style: { opacity: 0.5, fontSize: "9px" }
-  }, e.region)))), /* @__PURE__ */ React2.createElement("div", {
+  }, e.region)))), /* @__PURE__ */ React3.createElement("div", {
     style: { padding: "24px 28px" },
     className: "fade",
     key: tab + selected.ticker
-  }, tab === "matrix" && /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+  }, tab === "matrix" && /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { flex: 1, minWidth: "260px", background: "#060e1c", border: `1px solid ${selected.color}22`, borderLeft: `3px solid ${selected.color}`, borderRadius: "10px", padding: "18px 22px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }
-  }, /* @__PURE__ */ React2.createElement("span", {
+  }, /* @__PURE__ */ React3.createElement("span", {
     style: { fontWeight: 800, fontSize: "28px", color: selected.color, letterSpacing: ".02em" }
-  }, selected.ticker), /* @__PURE__ */ React2.createElement("span", {
+  }, selected.ticker), /* @__PURE__ */ React3.createElement("span", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: selected.color, border: `1px solid ${selected.color}44`, borderRadius: "3px", padding: "2px 8px" }
-  }, selected.region), /* @__PURE__ */ React2.createElement("span", {
+  }, selected.region), /* @__PURE__ */ React3.createElement("span", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#2d4a65", border: "1px solid #0e2035", borderRadius: "3px", padding: "2px 8px" }
-  }, selected.corr_group)), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.corr_group)), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "12px", color: "#5a7a95", lineHeight: 1.6, marginBottom: "12px" }
-  }, selected.name), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.name), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#8fa8c0", lineHeight: 1.7, borderTop: "1px solid #0a1e32", paddingTop: "12px" }
-  }, selected.why_short)), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.why_short)), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "12px", flexWrap: "wrap" }
-  }, [["AUM", selected.aum], ["Expense", selected.expense], ["Avg Corr", avgCorr], ["Risk", selected.risk]].map(([l, v]) => /* @__PURE__ */ React2.createElement("div", {
+  }, [["AUM", selected.aum], ["Expense", selected.expense], ["Avg Corr", avgCorr], ["Risk", selected.risk]].map(([l, v]) => /* @__PURE__ */ React3.createElement("div", {
     key: l,
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "8px", padding: "14px 18px", minWidth: "100px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
-  }, l), /* @__PURE__ */ React2.createElement("div", {
+  }, l), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "16px", fontWeight: 700, color: l === "Avg Corr" ? avgCorr > 0.5 ? "#f97316" : avgCorr > 0.3 ? "#eab308" : "#22c55e" : "#d1d9e6" }
-  }, v))))), /* @__PURE__ */ React2.createElement("div", {
+  }, v))))), /* @__PURE__ */ React3.createElement("div", {
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "24px", overflowX: "auto" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "24px", padding: "16px", background: "#030810", border: "1px solid #0a1e32", borderRadius: "8px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "12px", letterSpacing: ".05em" }
-  }, "FILTER ETFs FOR CORRELATION MATRIX:"), /* @__PURE__ */ React2.createElement("div", {
+  }, "FILTER ETFs FOR CORRELATION MATRIX:"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "6px", flexWrap: "wrap" }
   }, ETFS.map((e) => {
     const isVisible = visibleETFs.includes(e.id);
-    return /* @__PURE__ */ React2.createElement("button", {
+    return /* @__PURE__ */ React3.createElement("button", {
       key: e.id,
       className: `filter-pill ${isVisible ? "on" : ""}`,
       style: { "--c": e.color },
@@ -5998,29 +6448,29 @@ function App() {
         setVisibleETFs(isVisible ? visibleETFs.filter((id) => id !== e.id) : [...visibleETFs, e.id].sort((a, b) => a - b));
       }
     }, isVisible ? "\u2713 " : "+ ", e.ticker);
-  }), /* @__PURE__ */ React2.createElement("button", {
+  }), /* @__PURE__ */ React3.createElement("button", {
     className: "filter-pill",
     onClick: () => setVisibleETFs(ETFS.map((e) => e.id)),
     style: { marginLeft: "8px" }
-  }, "Select All"))), /* @__PURE__ */ React2.createElement("div", {
+  }, "Select All"))), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }
-  }, /* @__PURE__ */ React2.createElement("span", null, "PAIRWISE CORRELATION MATRIX \u2014 DAILY RETURN BASIS (ADJ CLOSE, 2019\u20132026)"), /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("span", null, "PAIRWISE CORRELATION MATRIX \u2014 DAILY RETURN BASIS (ADJ CLOSE, 2019\u20132026)"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "10px", fontSize: "9px" }
-  }, [["\u22650.7", "#f97316", "High"], ["0.3\u20130.7", "#eab308", "Mod"], ["0\u20130.3", "#22c55e", "Low"], ["<0", "#3b82f6", "Neg"]].map(([r, c, l]) => /* @__PURE__ */ React2.createElement("span", {
+  }, [["\u22650.7", "#f97316", "High"], ["0.3\u20130.7", "#eab308", "Mod"], ["0\u20130.3", "#22c55e", "Low"], ["<0", "#3b82f6", "Neg"]].map(([r, c, l]) => /* @__PURE__ */ React3.createElement("span", {
     key: l,
     style: { display: "flex", alignItems: "center", gap: "4px" }
-  }, /* @__PURE__ */ React2.createElement("span", {
+  }, /* @__PURE__ */ React3.createElement("span", {
     style: { width: "8px", height: "8px", borderRadius: "2px", background: c, display: "inline-block" }
-  }), /* @__PURE__ */ React2.createElement("span", {
+  }), /* @__PURE__ */ React3.createElement("span", {
     style: { color: "#2d4a65" }
-  }, r, " ", l))))), /* @__PURE__ */ React2.createElement("div", {
+  }, r, " ", l))))), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "grid", gridTemplateColumns: `80px repeat(${displayETFs.length},1fr)`, gap: "3px", minWidth: `${80 + displayETFs.length * 60}px` }
-  }, /* @__PURE__ */ React2.createElement("div", null), displayETFs.map((e) => /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", null), displayETFs.map((e) => /* @__PURE__ */ React3.createElement("div", {
     key: e.ticker,
     style: { textAlign: "center", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: e.ticker === selected.ticker ? e.color : "#2d4a65", padding: "4px 2px", fontWeight: e.ticker === selected.ticker ? 700 : 400 }
-  }, e.ticker)), displayETFs.map((row) => /* @__PURE__ */ React2.createElement(React2.Fragment, {
+  }, e.ticker)), displayETFs.map((row) => /* @__PURE__ */ React3.createElement(React3.Fragment, {
     key: row.ticker + "_row"
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: row.ticker === selected.ticker ? row.color : "#2d4a65", display: "flex", alignItems: "center", fontWeight: row.ticker === selected.ticker ? 700 : 400, paddingRight: "8px" }
   }, row.ticker), displayETFs.map((col) => {
     const ri = row.id;
@@ -6028,14 +6478,14 @@ function App() {
     const v = corrMatrix[ri][ci];
     const isSelf = ri === ci;
     const isHighlight = ri === selected.id || ci === selected.id;
-    return /* @__PURE__ */ React2.createElement("div", {
+    return /* @__PURE__ */ React3.createElement("div", {
       key: col.ticker,
       className: "corr-cell",
       style: {
         height: "42px",
-        background: isSelf ? "#0a1e32" : corrBg(v),
-        color: isSelf ? "#1e3a55" : corrColor(v),
-        border: isHighlight && !isSelf ? `1px solid ${corrColor(v)}55` : "1px solid transparent",
+        background: isSelf ? "#0a1e32" : corrBg2(v),
+        color: isSelf ? "#1e3a55" : corrColor2(v),
+        border: isHighlight && !isSelf ? `1px solid ${corrColor2(v)}55` : "1px solid transparent",
         opacity: isHighlight || isSelf ? 1 : 0.7
       },
       onMouseEnter: () => setHighlight({ ri, ci, v, a: row.ticker, b: col.ticker }),
@@ -6045,149 +6495,152 @@ function App() {
           setSelectedPair({ a: row, b: col, corr: v });
       }
     }, isSelf ? "\u2014" : v.toFixed(2));
-  })))), selectedPair && /* @__PURE__ */ React2.createElement("div", {
+  })))), selectedPair && /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "24px", padding: "20px", background: "#0a1e32", border: "1px solid #1a3858", borderRadius: "8px" },
     className: "fade"
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "14px", color: "#8fb8d8" }
-  }, "PAIR ANALYSIS: ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "PAIR ANALYSIS: ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: selectedPair.a.color }
-  }, selectedPair.a.ticker), " \xD7 ", /* @__PURE__ */ React2.createElement("strong", {
+  }, selectedPair.a.ticker), " \xD7 ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: selectedPair.b.color }
-  }, selectedPair.b.ticker)), /* @__PURE__ */ React2.createElement("button", {
+  }, selectedPair.b.ticker)), /* @__PURE__ */ React3.createElement("button", {
     onClick: () => setSelectedPair(null),
     style: { background: "transparent", border: "none", color: "#4a6a85", cursor: "pointer" }
-  }, "\u2715 CLOSE")), /* @__PURE__ */ React2.createElement("div", {
-    style: { fontSize: "18px", fontWeight: "bold", color: corrColor(selectedPair.corr), marginBottom: "12px" }
-  }, "Correlation Coefficient: ", selectedPair.corr.toFixed(2)), /* @__PURE__ */ React2.createElement("div", {
+  }, "\u2715 CLOSE")), /* @__PURE__ */ React3.createElement("div", {
+    style: { fontSize: "18px", fontWeight: "bold", color: corrColor2(selectedPair.corr), marginBottom: "12px" }
+  }, "Correlation Coefficient: ", selectedPair.corr.toFixed(2)), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#d1d9e6", lineHeight: 1.6 }
-  }, getPairExplanation(selectedPair.a, selectedPair.b, selectedPair.corr))), highlight && highlight.ri !== highlight.ci && /* @__PURE__ */ React2.createElement("div", {
+  }, getPairExplanation(selectedPair.a, selectedPair.b, selectedPair.corr))), highlight && highlight.ri !== highlight.ci && /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "12px", fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#4a6a85", borderTop: "1px solid #0a1e32", paddingTop: "10px" }
-  }, highlight.a, " \xD7 ", highlight.b, ": ", /* @__PURE__ */ React2.createElement("span", {
-    style: { color: corrColor(highlight.v) }
-  }, highlight.v.toFixed(2)), /* @__PURE__ */ React2.createElement("span", {
+  }, highlight.a, " \xD7 ", highlight.b, ": ", /* @__PURE__ */ React3.createElement("span", {
+    style: { color: corrColor2(highlight.v) }
+  }, highlight.v.toFixed(2)), /* @__PURE__ */ React3.createElement("span", {
     style: { marginLeft: "10px", color: "#3b82f6" }
-  }, "\u25B8 Click cell for detailed analysis"))), /* @__PURE__ */ React2.createElement("div", {
+  }, "\u25B8 Click cell for detailed analysis"))), /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "20px", display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: "10px" }
   }, [
     ["8 Asset Classes", "US Equity, Europe Equity, India EM, China Tech, HK Equity, Gold, Bonds, Commodities, REITs, Japan"],
     ["6 Geographic Regions", "US, Eurozone, India, China/HK, Japan, Global \u2014 each with distinct macro cycles"],
     ["3 Asset Types", "Equities (7), Fixed Income (1), Real Assets (2) \u2014 different return drivers"],
     ["Policy Divergence", "Fed, ECB, RBI, PBOC, BOJ \u2014 5 central banks, 5 policy cycles"]
-  ].map(([t, d]) => /* @__PURE__ */ React2.createElement("div", {
+  ].map(([t, d]) => /* @__PURE__ */ React3.createElement("div", {
     key: t,
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "8px", padding: "14px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#22c55e", marginBottom: "6px", letterSpacing: ".06em" }
-  }, t), /* @__PURE__ */ React2.createElement("div", {
+  }, t), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "11px", color: "#3a5a75", lineHeight: 1.6 }
-  }, d))))), tab === "chart" && /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+  }, d))))), tab === "chart" && /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }
-  }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
     style: { fontWeight: 800, fontSize: "32px", color: selected.color, letterSpacing: ".02em", lineHeight: 1 }
-  }, selected.ticker), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.ticker), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#3a5a75", marginTop: "4px" }
-  }, selected.name)), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.name)), /* @__PURE__ */ React3.createElement("div", {
     style: { textAlign: "right" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "28px", fontWeight: 700, color: +totalRet > 0 ? "#22c55e" : "#ef4444" }
-  }, +totalRet > 0 ? "+" : "", totalRet, "%"), /* @__PURE__ */ React2.createElement("div", {
+  }, +totalRet > 0 ? "+" : "", totalRet, "%"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55" }
-  }, chartRange, " WINDOW RETURN"))), /* @__PURE__ */ React2.createElement("div", {
+  }, chartRange, " WINDOW RETURN"))), /* @__PURE__ */ React3.createElement("div", {
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 16px 10px", marginBottom: "20px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".1em" }
-  }, "DAILY OHLC CANDLESTICK \xB7 YFINANCE"), /* @__PURE__ */ React2.createElement("div", {
+  }, "DAILY OHLC CANDLESTICK \xB7 YFINANCE"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "6px", flexWrap: "wrap" }
-  }, RANGE_OPTIONS.map((r) => /* @__PURE__ */ React2.createElement("button", {
+  }, RANGE_OPTIONS.map((r) => /* @__PURE__ */ React3.createElement("button", {
     key: r.id,
     className: `filter-pill ${chartRange === r.id ? "on" : ""}`,
     style: { "--c": selected.color },
     onClick: () => setChartRange(r.id)
-  }, r.label)))), /* @__PURE__ */ React2.createElement(CandlestickChart, {
+  }, r.label)))), /* @__PURE__ */ React3.createElement(CandlestickChart, {
     data: dailyOhlcData
-  })), /* @__PURE__ */ React2.createElement("div", {
+  })), /* @__PURE__ */ React3.createElement("div", {
     style: { background: "#060e1c", border: `1px solid ${selected.color}22`, borderLeft: `3px solid ${selected.color}`, borderRadius: "10px", padding: "20px 22px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: selected.color, letterSpacing: ".1em", marginBottom: "12px" }
-  }, "\u25B8 CORRELATION RATIONALE FOR SUPERVISOR REPORT"), /* @__PURE__ */ React2.createElement("div", {
+  }, "\u25B8 CORRELATION RATIONALE FOR SUPERVISOR REPORT"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#8fa8c0", lineHeight: 1.85 }
-  }, selected.why_full)), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.why_full)), /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "20px", background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "10px", padding: "20px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "14px" }
-  }, selected.ticker, " PAIRWISE CORRELATIONS"), /* @__PURE__ */ React2.createElement("div", {
+  }, selected.ticker, " PAIRWISE CORRELATIONS"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", gap: "8px", flexWrap: "wrap" }
   }, ETFS.filter((e) => e.ticker !== selected.ticker).map((e) => {
     const v = corrMatrix[selected.id][e.id];
-    return /* @__PURE__ */ React2.createElement("div", {
+    return /* @__PURE__ */ React3.createElement("div", {
       key: e.ticker,
-      style: { background: corrBg(v), border: `1px solid ${corrColor(v)}33`, borderRadius: "6px", padding: "10px 14px", minWidth: "90px" }
-    }, /* @__PURE__ */ React2.createElement("div", {
+      style: { background: corrBg2(v), border: `1px solid ${corrColor2(v)}33`, borderRadius: "6px", padding: "10px 14px", minWidth: "90px" }
+    }, /* @__PURE__ */ React3.createElement("div", {
       style: { fontFamily: "'Syne Mono',monospace", fontSize: "12px", fontWeight: 700, color: e.color, marginBottom: "4px" }
-    }, e.ticker), /* @__PURE__ */ React2.createElement("div", {
-      style: { fontFamily: "'Syne Mono',monospace", fontSize: "16px", fontWeight: 700, color: corrColor(v) }
-    }, v.toFixed(2)), /* @__PURE__ */ React2.createElement("div", {
+    }, e.ticker), /* @__PURE__ */ React3.createElement("div", {
+      style: { fontFamily: "'Syne Mono',monospace", fontSize: "16px", fontWeight: 700, color: corrColor2(v) }
+    }, v.toFixed(2)), /* @__PURE__ */ React3.createElement("div", {
       style: { fontFamily: "'Syne Mono',monospace", fontSize: "8px", color: "#2d4a65", marginTop: "3px" }
     }, e.region));
-  })))), tab === "backtest" && /* @__PURE__ */ React2.createElement(BacktestPanel, {
+  })))), tab === "backtest" && /* @__PURE__ */ React3.createElement(BacktestPanel, {
     etfs: ETFS,
     corrMatrix,
     ohlcData
-  }), tab === "report" && /* @__PURE__ */ React2.createElement("div", {
+  }), tab === "lab" && /* @__PURE__ */ React3.createElement(MarketLabPanel, {
+    baseAssets: ETFS,
+    baseOhlcData: ohlcData
+  }), tab === "report" && /* @__PURE__ */ React3.createElement("div", {
     style: { maxWidth: "860px", margin: "0 auto" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "36px 40px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
-  }, "INTERNAL RESEARCH MEMORANDUM"), /* @__PURE__ */ React2.createElement("div", {
+  }, "INTERNAL RESEARCH MEMORANDUM"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontWeight: 800, fontSize: "22px", color: "#f0f6ff", marginBottom: "4px", lineHeight: 1.3 }
-  }, "ETF Selection Rationale for Correlation Analysis Study"), /* @__PURE__ */ React2.createElement("div", {
+  }, "ETF Selection Rationale for Correlation Analysis Study"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#2d4a65", marginBottom: "32px", paddingBottom: "24px", borderBottom: "1px solid #0a1e32" }
-  }, "Prepared for: Portfolio Strategy Review \xA0|\xA0 Date: April 2026 \xA0|\xA0 Products: 10 ETFs"), /* @__PURE__ */ React2.createElement("div", {
+  }, "Prepared for: Portfolio Strategy Review \xA0|\xA0 Date: April 2026 \xA0|\xA0 Products: 10 ETFs"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.9, marginBottom: "28px" }
-  }, "The following 10 ETFs were selected specifically to maximize correlation dispersion across the portfolio. The primary criterion was ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "The following 10 ETFs were selected specifically to maximize correlation dispersion across the portfolio. The primary criterion was ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "structural independence of return drivers"), " \u2014 each product must be governed by materially different macroeconomic, policy, and fundamental forces."), /* @__PURE__ */ React2.createElement("div", {
+  }, "structural independence of return drivers"), " \u2014 each product must be governed by materially different macroeconomic, policy, and fundamental forces."), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "16px" }
-  }, "01 \u2014 SELECTION FRAMEWORK"), /* @__PURE__ */ React2.createElement("div", {
+  }, "01 \u2014 SELECTION FRAMEWORK"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.9 }
-  }, "Our selection process applied four orthogonality tests. First, ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "Our selection process applied four orthogonality tests. First, ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "geographic independence"), ": products must span distinct economic zones governed by different central banks (Fed, ECB, RBI, PBOC, BOJ). Second, ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "geographic independence"), ": products must span distinct economic zones governed by different central banks (Fed, ECB, RBI, PBOC, BOJ). Second, ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "asset class independence"), ": equities, fixed income, and real assets respond to different factor exposures. Third, ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "asset class independence"), ": equities, fixed income, and real assets respond to different factor exposures. Third, ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "sector/industry independence"), ": even within equities, country-specific and sector-specific returns diverge. Fourth, ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "sector/industry independence"), ": even within equities, country-specific and sector-specific returns diverge. Fourth, ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "crisis behavior independence"), ": products should not all fall simultaneously during market dislocations.")), /* @__PURE__ */ React2.createElement("div", {
+  }, "crisis behavior independence"), ": products should not all fall simultaneously during market dislocations.")), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "16px" }
-  }, "02 \u2014 SELECTED PRODUCTS & RATIONALE"), /* @__PURE__ */ React2.createElement("div", {
+  }, "02 \u2014 SELECTED PRODUCTS & RATIONALE"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "flex", flexDirection: "column", gap: "16px" }
-  }, ETFS.map((e, i) => /* @__PURE__ */ React2.createElement("div", {
+  }, ETFS.map((e, i) => /* @__PURE__ */ React3.createElement("div", {
     key: e.ticker,
     style: { display: "flex", gap: "16px", paddingBottom: "16px", borderBottom: "1px solid #080f1e" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "18px", fontWeight: 700, color: e.color, minWidth: "60px", paddingTop: "2px" }
-  }, e.ticker), /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+  }, e.ticker), /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "12px", color: "#3a5570", marginBottom: "6px" }
-  }, e.name, " \xA0\xB7\xA0 ", e.region, " \xA0\xB7\xA0 Expense: ", e.expense), /* @__PURE__ */ React2.createElement("div", {
+  }, e.name, " \xA0\xB7\xA0 ", e.region, " \xA0\xB7\xA0 Expense: ", e.expense), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.8 }
-  }, e.why_full)))))), /* @__PURE__ */ React2.createElement("div", {
+  }, e.why_full)))))), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "16px" }
-  }, "03 \u2014 CORRELATION STRUCTURE SUMMARY"), /* @__PURE__ */ React2.createElement("div", {
+  }, "03 \u2014 CORRELATION STRUCTURE SUMMARY"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.9, marginBottom: "16px" }
-  }, "The correlation matrix computed from Yahoo adjusted-close daily returns shows the following structure across asset class clusters:"), /* @__PURE__ */ React2.createElement("div", {
+  }, "The correlation matrix computed from Yahoo adjusted-close daily returns shows the following structure across asset class clusters:"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }
   }, [
     ["US vs. Europe (SPY/EZU)", "~0.72 \u2014 moderate, driven by global risk-on/off but different valuations & ECB policy"],
@@ -6198,45 +6651,45 @@ function App() {
     ["Gold vs. Bonds (GLD/TLT)", "~0.18 \u2014 low; both are defensive but respond to different stress types"],
     ["Bonds vs. Commodities (TLT/DBC)", "~-0.12 \u2014 negative; inflation raises DBC, damages TLT"],
     ["Japan vs. China (EWJ/KWEB)", "~0.38 \u2014 low; BOJ vs. PBOC policy environments are structurally divergent"]
-  ].map(([pair, desc]) => /* @__PURE__ */ React2.createElement("div", {
+  ].map(([pair, desc]) => /* @__PURE__ */ React3.createElement("div", {
     key: pair,
     style: { background: "#070f1e", border: "1px solid #0a1a2e", borderRadius: "6px", padding: "12px 14px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#d1d9e6", marginBottom: "5px" }
-  }, pair), /* @__PURE__ */ React2.createElement("div", {
+  }, pair), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "11px", color: "#3a5570", lineHeight: 1.6 }
-  }, desc))))), /* @__PURE__ */ React2.createElement("div", {
+  }, desc))))), /* @__PURE__ */ React3.createElement("div", {
     style: { background: "rgba(34,197,94,.05)", border: "1px solid rgba(34,197,94,.15)", borderRadius: "8px", padding: "18px 20px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "10px" }
-  }, "04 \u2014 CONCLUSION"), /* @__PURE__ */ React2.createElement("div", {
+  }, "04 \u2014 CONCLUSION"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.9 }
-  }, "This 10-ETF portfolio spans ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "This 10-ETF portfolio spans ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "6 geographic regions"), ", ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "6 geographic regions"), ", ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "5 central bank policy environments"), ", and ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "5 central bank policy environments"), ", and ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "3 asset classes"), ". The average pairwise correlation of the portfolio is approximately ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "3 asset classes"), ". The average pairwise correlation of the portfolio is approximately ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#22c55e" }
-  }, "0.30"), " \u2014 well below a US-only equity portfolio which would average 0.80+. Critically, the portfolio contains ", /* @__PURE__ */ React2.createElement("strong", {
+  }, "0.30"), " \u2014 well below a US-only equity portfolio which would average 0.80+. Critically, the portfolio contains ", /* @__PURE__ */ React3.createElement("strong", {
     style: { color: "#d1d9e6" }
-  }, "multiple negatively correlated pairs"), " (SPY/TLT, TLT/DBC) and near-zero pairs (SPY/GLD), providing genuine diversification benefit rather than mere sector rotation. This selection provides the broadest possible base for a statistically meaningful correlation analysis.")), /* @__PURE__ */ React2.createElement("div", {
+  }, "multiple negatively correlated pairs"), " (SPY/TLT, TLT/DBC) and near-zero pairs (SPY/GLD), providing genuine diversification benefit rather than mere sector rotation. This selection provides the broadest possible base for a statistically meaningful correlation analysis.")), /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "20px", fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#0e2035", lineHeight: 1.7 }
-  }, "DISCLAIMER: Correlations are computed from historical adjusted-close returns and are time-varying across market regimes. This memorandum is for internal analytical purposes only and does not constitute investment advice."))), tab === "sources" && /* @__PURE__ */ React2.createElement("div", {
+  }, "DISCLAIMER: Correlations are computed from historical adjusted-close returns and are time-varying across market regimes. This memorandum is for internal analytical purposes only and does not constitute investment advice."))), tab === "sources" && /* @__PURE__ */ React3.createElement("div", {
     style: { maxWidth: "860px", margin: "0 auto" },
     className: "fade"
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "36px 40px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
-  }, "METHODOLOGY & REFERENCES"), /* @__PURE__ */ React2.createElement("div", {
+  }, "METHODOLOGY & REFERENCES"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontWeight: 800, fontSize: "22px", color: "#f0f6ff", marginBottom: "24px", lineHeight: 1.3 }
-  }, "Data Sources and Calculation Methodology"), /* @__PURE__ */ React2.createElement("div", {
+  }, "Data Sources and Calculation Methodology"), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "12px" }
-  }, "PRIMARY DATA PROVIDERS"), /* @__PURE__ */ React2.createElement("div", {
+  }, "PRIMARY DATA PROVIDERS"), /* @__PURE__ */ React3.createElement("div", {
     style: { display: "grid", gap: "12px" }
   }, [
     ["Yahoo Finance", "Primary open data source for daily OHLCV and adjusted close (Adj Close)."],
@@ -6245,28 +6698,28 @@ function App() {
     ["Adjusted Close Method", "Uses adjusted prices for return/correlation calculations."],
     ["Fund Fact Sheets", "BlackRock/iShares and State Street SPDR official reports for AUM, Expense Ratios, and Holdings."],
     ["Common Sample Window", "Correlation matrix uses overlapping daily observations across all ETFs."]
-  ].map(([src, desc]) => /* @__PURE__ */ React2.createElement("div", {
+  ].map(([src, desc]) => /* @__PURE__ */ React3.createElement("div", {
     key: src,
     style: { display: "flex", gap: "16px", alignItems: "baseline", background: "#030810", padding: "12px 16px", borderRadius: "6px", border: "1px solid #0a1a2e" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", color: "#8fb8d8", fontSize: "12px", fontWeight: 700, minWidth: "140px" }
-  }, src), /* @__PURE__ */ React2.createElement("div", {
+  }, src), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5" }
-  }, desc))))), /* @__PURE__ */ React2.createElement("div", {
+  }, desc))))), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "12px" }
-  }, "PRICE SERIES CONSTRUCTION"), /* @__PURE__ */ React2.createElement("div", {
+  }, "PRICE SERIES CONSTRUCTION"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.8, background: "#030810", padding: "16px", borderRadius: "6px", border: "1px solid #0a1a2e" }
-  }, "Price charts now use ", /* @__PURE__ */ React2.createElement("strong", null, "real month-end adjusted closes"), " directly from Yahoo Finance via yfinance (no interpolation, no simulated path). ", /* @__PURE__ */ React2.createElement("br", null), /* @__PURE__ */ React2.createElement("br", null), "For each ETF, daily Adj Close is downloaded from 2019-01-01 onward, then resampled to month-end closes for visualization. Adjusted prices account for distributions/corporate actions, making cross-asset return comparisons more consistent.")), /* @__PURE__ */ React2.createElement("div", {
+  }, "Price charts now use ", /* @__PURE__ */ React3.createElement("strong", null, "real month-end adjusted closes"), " directly from Yahoo Finance via yfinance (no interpolation, no simulated path). ", /* @__PURE__ */ React3.createElement("br", null), /* @__PURE__ */ React3.createElement("br", null), "For each ETF, daily Adj Close is downloaded from 2019-01-01 onward, then resampled to month-end closes for visualization. Adjusted prices account for distributions/corporate actions, making cross-asset return comparisons more consistent.")), /* @__PURE__ */ React3.createElement("div", {
     style: { marginBottom: "28px" }
-  }, /* @__PURE__ */ React2.createElement("div", {
+  }, /* @__PURE__ */ React3.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "11px", color: "#22c55e", letterSpacing: ".08em", marginBottom: "12px" }
-  }, "CORRELATION MATRIX CONSTRUCTION"), /* @__PURE__ */ React2.createElement("div", {
+  }, "CORRELATION MATRIX CONSTRUCTION"), /* @__PURE__ */ React3.createElement("div", {
     style: { fontSize: "13px", color: "#7a9ab5", lineHeight: 1.8, background: "#030810", padding: "16px", borderRadius: "6px", border: "1px solid #0a1a2e" }
-  }, "Pairwise correlations are computed from ", /* @__PURE__ */ React2.createElement("strong", null, "daily returns of adjusted close prices"), " over the common sample window (2019\u2013latest). This avoids subjective parameter tuning and directly reflects observed co-movement in market data.")), /* @__PURE__ */ React2.createElement("div", {
+  }, "Pairwise correlations are computed from ", /* @__PURE__ */ React3.createElement("strong", null, "daily returns of adjusted close prices"), " over the common sample window (2019\u2013latest). This avoids subjective parameter tuning and directly reflects observed co-movement in market data.")), /* @__PURE__ */ React3.createElement("div", {
     style: { marginTop: "32px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5570", lineHeight: 1.6, borderTop: "1px solid #0a1e32", paddingTop: "16px" }
-  }, /* @__PURE__ */ React2.createElement("strong", null, "DISCLAIMER:"), " This dashboard is an interactive analytical research tool. Price series and correlation metrics are derived from Yahoo Finance adjusted-close data and may change as new data becomes available. It is not intended as direct financial advice.")))));
+  }, /* @__PURE__ */ React3.createElement("strong", null, "DISCLAIMER:"), " This dashboard is an interactive analytical research tool. Price series and correlation metrics are derived from Yahoo Finance adjusted-close data and may change as new data becomes available. It is not intended as direct financial advice.")))));
 }
 export {
   App as default
