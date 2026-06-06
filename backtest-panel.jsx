@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   alignAdjCloseSeries,
   runPortfolioBacktest,
@@ -127,7 +127,9 @@ export default function BacktestPanel({
   title = "Portfolio Backtest (Rebalance + Benchmark)",
   description = "",
   helperNote = "",
+  autoRunRequest = null,
 }) {
+  const handledAutoRunIdRef = useRef(null);
   const [tickers, setTickers] = useState(() => deriveDefaultTickers(etfs, defaultTickers));
   const [weightsPct, setWeightsPct] = useState(() => {
     const initial = deriveDefaultTickers(etfs, defaultTickers);
@@ -231,23 +233,33 @@ export default function BacktestPanel({
     }
   };
 
-  const run = () => {
+  const executeBacktest = ({
+    nextTickers = tickers,
+    nextWeightsPct = weightsPct,
+    nextStartDate = startDate,
+    nextEndDate = endDate,
+    nextInitialCapital = initialCapital,
+    nextRebalance = rebalance,
+    nextFeeBps = feeBps,
+    nextSlippageBps = slippageBps,
+    nextRiskFree = riskFree,
+  } = {}) => {
     setStatus("");
     setResult(null);
-    const tickersForAlign = Array.from(new Set([...tickers, benchmarkTicker].filter(Boolean)));
-    if (!tickers.length) {
+    const tickersForAlign = Array.from(new Set([...nextTickers, benchmarkTicker].filter(Boolean)));
+    if (!nextTickers.length) {
       setStatus("Please select at least 1 asset.");
-      return;
+      return false;
     }
     if (!tickersForAlign.every((t) => (ohlcData?.[t] || []).length)) {
       setStatus("OHLC data is not loaded yet. Please wait a moment or click RELOAD DATA.");
-      return;
+      return false;
     }
-    if (!startDate || !endDate || startDate > endDate) {
+    if (!nextStartDate || !nextEndDate || nextStartDate > nextEndDate) {
       setStatus("Please select a valid date range.");
-      return;
+      return false;
     }
-    let aligned = alignAdjCloseSeries(ohlcData, tickersForAlign, startDate, endDate);
+    let aligned = alignAdjCloseSeries(ohlcData, tickersForAlign, nextStartDate, nextEndDate);
     if (!aligned.dates.length) {
       const fallback = alignAdjCloseSeries(ohlcData, tickersForAlign);
       if (fallback.dates.length) {
@@ -258,32 +270,74 @@ export default function BacktestPanel({
         aligned = fallback;
       } else {
         setStatus("No overlapping trading dates for selected ETFs and benchmark. Please click RELOAD DATA.");
-        return;
+        return false;
       }
     }
     if (!aligned.dates.length) {
       setStatus("No overlapping trading dates for selected ETFs in this range.");
-      return;
+      return false;
     }
     const w = {};
-    for (const t of tickers) w[t] = (Number(weightsPct?.[t]) || 0) / 100;
+    for (const t of nextTickers) w[t] = (Number(nextWeightsPct?.[t]) || 0) / 100;
     const res = runPortfolioBacktest({
-      tickers,
+      tickers: nextTickers,
       aligned,
-      initialCapital,
+      initialCapital: nextInitialCapital,
       weightsByTicker: w,
-      rebalanceFreq: rebalance,
+      rebalanceFreq: nextRebalance,
       benchmarkTicker,
-      feeBps,
-      slippageBps,
-      riskFreeRateAnnual: (Number(riskFree) || 0) / 100,
+      feeBps: nextFeeBps,
+      slippageBps: nextSlippageBps,
+      riskFreeRateAnnual: (Number(nextRiskFree) || 0) / 100,
     });
     if (!res?.metrics) {
       setStatus("Backtest failed.");
-      return;
+      return false;
     }
     setResult(res);
+    return true;
   };
+
+  const run = () => executeBacktest();
+
+  useEffect(() => {
+    if (!autoRunRequest?.id || handledAutoRunIdRef.current === autoRunRequest.id) return;
+    const nextTickers = (autoRunRequest.tickers || []).filter(Boolean);
+    if (!nextTickers.length) return;
+    if (!nextTickers.every((ticker) => (ohlcData?.[ticker] || []).length)) return;
+
+    const weightsPctOverride = autoRunRequest.weightsPct || Object.fromEntries(
+      nextTickers.map((ticker) => [ticker, 100 / nextTickers.length]),
+    );
+    const tickersForAlign = Array.from(new Set([...nextTickers, benchmarkTicker].filter(Boolean)));
+    const aligned = alignAdjCloseSeries(ohlcData, tickersForAlign);
+    if (!aligned.dates.length) return;
+
+    const nextStart = autoRunRequest.startDate || aligned.dates[0];
+    const nextEnd = autoRunRequest.endDate || aligned.dates[aligned.dates.length - 1];
+
+    setTickers(nextTickers);
+    setWeightsPct(weightsPctOverride);
+    setInitialCapital(Number(autoRunRequest.initialCapital) || 100000);
+    setRebalance(autoRunRequest.rebalance || "monthly");
+    setFeeBps(Number(autoRunRequest.feeBps) || 0);
+    setSlippageBps(Number(autoRunRequest.slippageBps) || 0);
+    setRiskFree(Number(autoRunRequest.riskFree) || 0);
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    handledAutoRunIdRef.current = autoRunRequest.id;
+    executeBacktest({
+      nextTickers,
+      nextWeightsPct: weightsPctOverride,
+      nextStartDate: nextStart,
+      nextEndDate: nextEnd,
+      nextInitialCapital: Number(autoRunRequest.initialCapital) || 100000,
+      nextRebalance: autoRunRequest.rebalance || "monthly",
+      nextFeeBps: Number(autoRunRequest.feeBps) || 0,
+      nextSlippageBps: Number(autoRunRequest.slippageBps) || 0,
+      nextRiskFree: Number(autoRunRequest.riskFree) || 0,
+    });
+  }, [autoRunRequest, benchmarkTicker, ohlcData]);
 
   return (
     <div>

@@ -53,6 +53,11 @@ const STARTER_PACKS = [
     description: "The fastest first test: equity beta, duration, gold and commodities in one professional cross-asset universe.",
     symbols: ["SPY", "TLT", "GLD", "DBC"],
     requiresBridge: false,
+    backtest: {
+      weightsPct: { SPY: 35, TLT: 35, GLD: 15, DBC: 15 },
+      rebalance: "monthly",
+      initialCapital: 100000,
+    },
   },
   {
     id: "ai-platforms",
@@ -61,6 +66,11 @@ const STARTER_PACKS = [
     description: "A concentrated technology research basket for testing momentum, benchmark linkage and concentration risk.",
     symbols: ["AAPL", "MSFT", "NVDA", "TSM"],
     requiresBridge: true,
+    backtest: {
+      weightsPct: { AAPL: 20, MSFT: 30, NVDA: 30, TSM: 20 },
+      rebalance: "quarterly",
+      initialCapital: 100000,
+    },
   },
   {
     id: "global-diversifiers",
@@ -69,6 +79,11 @@ const STARTER_PACKS = [
     description: "A broader regime-comparison set combining US equity, Japan, India, gold and Bitcoin.",
     symbols: ["SPY", "EWJ", "INDA", "GLD", "BTC-USD"],
     requiresBridge: true,
+    backtest: {
+      weightsPct: { SPY: 30, EWJ: 20, INDA: 20, GLD: 15, "BTC-USD": 15 },
+      rebalance: "monthly",
+      initialCapital: 100000,
+    },
   },
 ];
 
@@ -88,6 +103,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
   const [status, setStatus] = useState("");
   const [importingSymbol, setImportingSymbol] = useState("");
   const [importingPack, setImportingPack] = useState("");
+  const [autoRunRequest, setAutoRunRequest] = useState(null);
   const [assetMap, setAssetMap] = useState(() => baseAssetMap);
   const [extraOhlc, setExtraOhlc] = useState({});
   const [universeTickers, setUniverseTickers] = useState(["SPY", "TLT", "GLD"]);
@@ -228,6 +244,24 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
     }
   };
 
+  const runStarterPack = async (pack) => {
+    if (!pack) return;
+    try {
+      setImportingPack(`${pack.id}-run`);
+      await importSymbols(pack.symbols, { replaceUniverse: true, packLabel: `${pack.title} ready for backtest` });
+      setAutoRunRequest({
+        id: `${pack.id}-${Date.now()}`,
+        tickers: pack.symbols,
+        weightsPct: pack.backtest?.weightsPct,
+        rebalance: pack.backtest?.rebalance || "monthly",
+        initialCapital: pack.backtest?.initialCapital || 100000,
+      });
+      setStatus(`${pack.title} loaded and default backtest started.`);
+    } finally {
+      setImportingPack("");
+    }
+  };
+
   const removeTicker = (ticker) => {
     if (universeTickers.length <= 2) return;
     setUniverseTickers((prev) => prev.filter((item) => item !== ticker));
@@ -236,12 +270,12 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
 
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"1.2fr .8fr",gap:"16px",alignItems:"stretch",marginBottom:"18px"}}>
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1.25fr .75fr",gap:"14px",alignItems:"stretch",marginBottom:"16px"}}>
+        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"18px 20px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>FULL UNIVERSE MODE</div>
           <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:"8px"}}>Yahoo Search + Dynamic Correlation + Portfolio Backtest</div>
-          <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"14px"}}>
-            Search any Yahoo-compatible stock, ETF, ADR or international symbol, import its daily history, then run correlation analysis and backtests in the same workspace.
+          <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.6,marginBottom:"12px"}}>
+            Search or load a starter pack, then use the same universe for correlation analysis and portfolio backtesting.
           </div>
           <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center",marginBottom:"14px"}}>
             <input
@@ -264,7 +298,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
               {importingSymbol ? `IMPORTING ${importingSymbol}...` : "ADD SYMBOL"}
             </button>
           </div>
-          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"14px"}}>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"10px"}}>
             {QUICK_SYMBOLS.map((symbol) => (
               <button
                 key={symbol}
@@ -275,6 +309,9 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
                 {symbol}
               </button>
             ))}
+          </div>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#4a6a85",marginBottom:"8px"}}>
+            Quick symbols help first-time users start without typing.
           </div>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:bridgeReady ? "#22c55e" : "#f59e0b",marginBottom:"8px"}}>
             {bridgeMessage}
@@ -289,7 +326,7 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
           )}
         </div>
 
-        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"18px 20px"}}>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"10px"}}>UNIVERSE STATUS</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"10px"}}>
             {[
@@ -307,12 +344,12 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
         </div>
       </div>
 
-      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px",marginBottom:"18px"}}>
+      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"18px 20px",marginBottom:"16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap",marginBottom:"12px"}}>
           <div>
             <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>STARTER PACKS</div>
             <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7}}>
-              Professional example universes for first-time users. One click replaces the active universe and loads a ready-to-analyze set.
+              Professional example universes for first-time users. You can load the pack only, or load it and immediately run a default portfolio backtest.
             </div>
           </div>
           <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#4a6a85"}}>
@@ -358,15 +395,26 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
                     </span>
                   ))}
                 </div>
-                <button
-                  className="nav-tab"
-                  onClick={() => loadStarterPack(pack)}
-                  disabled={disabled}
-                  style={isActive ? {background:"#0e2540",borderColor:"#1b3b2a",color:"#22c55e"} : {}}
-                  title={pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Replace current universe with this pack"}
-                >
-                  {importingPack === pack.id ? "LOADING PACK..." : "LOAD PACK"}
-                </button>
+                <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                  <button
+                    className="nav-tab"
+                    onClick={() => loadStarterPack(pack)}
+                    disabled={disabled}
+                    style={isActive ? {background:"#0e2540",borderColor:"#1b3b2a",color:"#22c55e"} : {}}
+                    title={pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Replace current universe with this pack"}
+                  >
+                    {importingPack === pack.id ? "LOADING..." : "LOAD PACK"}
+                  </button>
+                  <button
+                    className="nav-tab on"
+                    onClick={() => runStarterPack(pack)}
+                    disabled={disabled}
+                    style={{background:"#0e2540",borderColor:"#143a61",color:"#8fb8d8"}}
+                    title={pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Load pack and immediately run the default backtest"}
+                  >
+                    {importingPack === `${pack.id}-run` ? "RUNNING..." : "LOAD + RUN"}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -399,8 +447,13 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
         </div>
       )}
 
-      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px",marginBottom:"18px"}}>
-        <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0",marginBottom:"12px"}}>ACTIVE UNIVERSE</div>
+      <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"16px 20px",marginBottom:"16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap",marginBottom:"10px"}}>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fa8c0"}}>ACTIVE UNIVERSE</div>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#4a6a85"}}>
+            Click a ticker to remove it from the current research set.
+          </div>
+        </div>
         <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
           {universeTickers.map((ticker) => {
             const asset = assetMap[ticker];
@@ -497,7 +550,8 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
         defaultTickers={availableTickers}
         title="Global Yahoo Portfolio Backtest"
         description="Run portfolio backtests on any imported Yahoo-compatible assets."
-        helperNote="Search and import assets above. SPY remains the default benchmark."
+        helperNote="Search, load a starter pack, or use LOAD + RUN above. SPY remains the default benchmark."
+        autoRunRequest={autoRunRequest}
       />
     </div>
   );

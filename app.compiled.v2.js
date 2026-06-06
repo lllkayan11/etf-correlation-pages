@@ -2,7 +2,7 @@
 import React3, { useEffect as useEffect3, useState as useState3, useMemo as useMemo3 } from "react";
 
 // backtest-panel.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 // backtest-engine.js
 var clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -452,8 +452,10 @@ function BacktestPanel({
   defaultTickers,
   title = "Portfolio Backtest (Rebalance + Benchmark)",
   description = "",
-  helperNote = ""
+  helperNote = "",
+  autoRunRequest = null
 }) {
+  const handledAutoRunIdRef = useRef(null);
   const [tickers, setTickers] = useState(() => deriveDefaultTickers(etfs, defaultTickers));
   const [weightsPct, setWeightsPct] = useState(() => {
     const initial = deriveDefaultTickers(etfs, defaultTickers);
@@ -558,23 +560,33 @@ function BacktestPanel({
       setWeightsPct(wPct);
     }
   };
-  const run = () => {
+  const executeBacktest = ({
+    nextTickers = tickers,
+    nextWeightsPct = weightsPct,
+    nextStartDate = startDate,
+    nextEndDate = endDate,
+    nextInitialCapital = initialCapital,
+    nextRebalance = rebalance,
+    nextFeeBps = feeBps,
+    nextSlippageBps = slippageBps,
+    nextRiskFree = riskFree
+  } = {}) => {
     setStatus("");
     setResult(null);
-    const tickersForAlign = Array.from(new Set([...tickers, benchmarkTicker].filter(Boolean)));
-    if (!tickers.length) {
+    const tickersForAlign = Array.from(new Set([...nextTickers, benchmarkTicker].filter(Boolean)));
+    if (!nextTickers.length) {
       setStatus("Please select at least 1 asset.");
-      return;
+      return false;
     }
     if (!tickersForAlign.every((t) => (ohlcData?.[t] || []).length)) {
       setStatus("OHLC data is not loaded yet. Please wait a moment or click RELOAD DATA.");
-      return;
+      return false;
     }
-    if (!startDate || !endDate || startDate > endDate) {
+    if (!nextStartDate || !nextEndDate || nextStartDate > nextEndDate) {
       setStatus("Please select a valid date range.");
-      return;
+      return false;
     }
-    let aligned = alignAdjCloseSeries(ohlcData, tickersForAlign, startDate, endDate);
+    let aligned = alignAdjCloseSeries(ohlcData, tickersForAlign, nextStartDate, nextEndDate);
     if (!aligned.dates.length) {
       const fallback = alignAdjCloseSeries(ohlcData, tickersForAlign);
       if (fallback.dates.length) {
@@ -585,33 +597,72 @@ function BacktestPanel({
         aligned = fallback;
       } else {
         setStatus("No overlapping trading dates for selected ETFs and benchmark. Please click RELOAD DATA.");
-        return;
+        return false;
       }
     }
     if (!aligned.dates.length) {
       setStatus("No overlapping trading dates for selected ETFs in this range.");
-      return;
+      return false;
     }
     const w = {};
-    for (const t of tickers)
-      w[t] = (Number(weightsPct?.[t]) || 0) / 100;
+    for (const t of nextTickers)
+      w[t] = (Number(nextWeightsPct?.[t]) || 0) / 100;
     const res = runPortfolioBacktest({
-      tickers,
+      tickers: nextTickers,
       aligned,
-      initialCapital,
+      initialCapital: nextInitialCapital,
       weightsByTicker: w,
-      rebalanceFreq: rebalance,
+      rebalanceFreq: nextRebalance,
       benchmarkTicker,
-      feeBps,
-      slippageBps,
-      riskFreeRateAnnual: (Number(riskFree) || 0) / 100
+      feeBps: nextFeeBps,
+      slippageBps: nextSlippageBps,
+      riskFreeRateAnnual: (Number(nextRiskFree) || 0) / 100
     });
     if (!res?.metrics) {
       setStatus("Backtest failed.");
-      return;
+      return false;
     }
     setResult(res);
+    return true;
   };
+  const run = () => executeBacktest();
+  useEffect(() => {
+    if (!autoRunRequest?.id || handledAutoRunIdRef.current === autoRunRequest.id)
+      return;
+    const nextTickers = (autoRunRequest.tickers || []).filter(Boolean);
+    if (!nextTickers.length)
+      return;
+    if (!nextTickers.every((ticker) => (ohlcData?.[ticker] || []).length))
+      return;
+    const weightsPctOverride = autoRunRequest.weightsPct || Object.fromEntries(nextTickers.map((ticker) => [ticker, 100 / nextTickers.length]));
+    const tickersForAlign = Array.from(new Set([...nextTickers, benchmarkTicker].filter(Boolean)));
+    const aligned = alignAdjCloseSeries(ohlcData, tickersForAlign);
+    if (!aligned.dates.length)
+      return;
+    const nextStart = autoRunRequest.startDate || aligned.dates[0];
+    const nextEnd = autoRunRequest.endDate || aligned.dates[aligned.dates.length - 1];
+    setTickers(nextTickers);
+    setWeightsPct(weightsPctOverride);
+    setInitialCapital(Number(autoRunRequest.initialCapital) || 1e5);
+    setRebalance(autoRunRequest.rebalance || "monthly");
+    setFeeBps(Number(autoRunRequest.feeBps) || 0);
+    setSlippageBps(Number(autoRunRequest.slippageBps) || 0);
+    setRiskFree(Number(autoRunRequest.riskFree) || 0);
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    handledAutoRunIdRef.current = autoRunRequest.id;
+    executeBacktest({
+      nextTickers,
+      nextWeightsPct: weightsPctOverride,
+      nextStartDate: nextStart,
+      nextEndDate: nextEnd,
+      nextInitialCapital: Number(autoRunRequest.initialCapital) || 1e5,
+      nextRebalance: autoRunRequest.rebalance || "monthly",
+      nextFeeBps: Number(autoRunRequest.feeBps) || 0,
+      nextSlippageBps: Number(autoRunRequest.slippageBps) || 0,
+      nextRiskFree: Number(autoRunRequest.riskFree) || 0
+    });
+  }, [autoRunRequest, benchmarkTicker, ohlcData]);
   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
     style: { display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "stretch" }
   }, /* @__PURE__ */ React.createElement("div", {
@@ -896,7 +947,12 @@ var STARTER_PACKS = [
     subtitle: "Recommended starter pack",
     description: "The fastest first test: equity beta, duration, gold and commodities in one professional cross-asset universe.",
     symbols: ["SPY", "TLT", "GLD", "DBC"],
-    requiresBridge: false
+    requiresBridge: false,
+    backtest: {
+      weightsPct: { SPY: 35, TLT: 35, GLD: 15, DBC: 15 },
+      rebalance: "monthly",
+      initialCapital: 1e5
+    }
   },
   {
     id: "ai-platforms",
@@ -904,7 +960,12 @@ var STARTER_PACKS = [
     subtitle: "Growth / semiconductor stack",
     description: "A concentrated technology research basket for testing momentum, benchmark linkage and concentration risk.",
     symbols: ["AAPL", "MSFT", "NVDA", "TSM"],
-    requiresBridge: true
+    requiresBridge: true,
+    backtest: {
+      weightsPct: { AAPL: 20, MSFT: 30, NVDA: 30, TSM: 20 },
+      rebalance: "quarterly",
+      initialCapital: 1e5
+    }
   },
   {
     id: "global-diversifiers",
@@ -912,7 +973,12 @@ var STARTER_PACKS = [
     subtitle: "Cross-region mixed drivers",
     description: "A broader regime-comparison set combining US equity, Japan, India, gold and Bitcoin.",
     symbols: ["SPY", "EWJ", "INDA", "GLD", "BTC-USD"],
-    requiresBridge: true
+    requiresBridge: true,
+    backtest: {
+      weightsPct: { SPY: 30, EWJ: 20, INDA: 20, GLD: 15, "BTC-USD": 15 },
+      rebalance: "monthly",
+      initialCapital: 1e5
+    }
   }
 ];
 var QUICK_SYMBOLS = ["AAPL", "MSFT", "NVDA", "TSM", "BTC-USD", "QQQ"];
@@ -927,6 +993,7 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
   const [status, setStatus] = useState2("");
   const [importingSymbol, setImportingSymbol] = useState2("");
   const [importingPack, setImportingPack] = useState2("");
+  const [autoRunRequest, setAutoRunRequest] = useState2(null);
   const [assetMap, setAssetMap] = useState2(() => baseAssetMap);
   const [extraOhlc, setExtraOhlc] = useState2({});
   const [universeTickers, setUniverseTickers] = useState2(["SPY", "TLT", "GLD"]);
@@ -1043,6 +1110,24 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
       setImportingPack("");
     }
   };
+  const runStarterPack = async (pack) => {
+    if (!pack)
+      return;
+    try {
+      setImportingPack(`${pack.id}-run`);
+      await importSymbols(pack.symbols, { replaceUniverse: true, packLabel: `${pack.title} ready for backtest` });
+      setAutoRunRequest({
+        id: `${pack.id}-${Date.now()}`,
+        tickers: pack.symbols,
+        weightsPct: pack.backtest?.weightsPct,
+        rebalance: pack.backtest?.rebalance || "monthly",
+        initialCapital: pack.backtest?.initialCapital || 1e5
+      });
+      setStatus(`${pack.title} loaded and default backtest started.`);
+    } finally {
+      setImportingPack("");
+    }
+  };
   const removeTicker = (ticker) => {
     if (universeTickers.length <= 2)
       return;
@@ -1050,16 +1135,16 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
     setSelectedPair(null);
   };
   return /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
-    style: { display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: "16px", alignItems: "stretch", marginBottom: "18px" }
+    style: { display: "grid", gridTemplateColumns: "1.25fr .75fr", gap: "14px", alignItems: "stretch", marginBottom: "16px" }
   }, /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "18px 20px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "FULL UNIVERSE MODE"), /* @__PURE__ */ React2.createElement("div", {
     style: { fontWeight: 800, fontSize: "18px", color: "#f0f6ff", marginBottom: "8px" }
   }, "Yahoo Search + Dynamic Correlation + Portfolio Backtest"), /* @__PURE__ */ React2.createElement("div", {
-    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7, marginBottom: "14px" }
-  }, "Search any Yahoo-compatible stock, ETF, ADR or international symbol, import its daily history, then run correlation analysis and backtests in the same workspace."), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.6, marginBottom: "12px" }
+  }, "Search or load a starter pack, then use the same universe for correlation analysis and portfolio backtesting."), /* @__PURE__ */ React2.createElement("div", {
     style: { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "14px" }
   }, /* @__PURE__ */ React2.createElement("input", {
     value: query,
@@ -1077,20 +1162,22 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
     disabled: !bridgeReady || !query.trim() || !!importingSymbol || !!importingPack,
     style: { background: "#0e2540", borderColor: "#143a61", color: "#8fb8d8" }
   }, importingSymbol ? `IMPORTING ${importingSymbol}...` : "ADD SYMBOL")), /* @__PURE__ */ React2.createElement("div", {
-    style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }
+    style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }
   }, QUICK_SYMBOLS.map((symbol) => /* @__PURE__ */ React2.createElement("button", {
     key: symbol,
     className: "filter-pill",
     onClick: () => setQuery(symbol),
     title: `Use ${symbol} as a search shortcut`
   }, symbol))), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#4a6a85", marginBottom: "8px" }
+  }, "Quick symbols help first-time users start without typing."), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: bridgeReady ? "#22c55e" : "#f59e0b", marginBottom: "8px" }
   }, bridgeMessage), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
   }, "Best execution path: run the app via `python3 local_refresh_server.py`, then open `http://127.0.0.1:8765/`."), status && /* @__PURE__ */ React2.createElement("div", {
     style: { marginTop: "12px", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fb8d8" }
   }, status)), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "18px 20px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "10px" }
   }, "UNIVERSE STATUS"), /* @__PURE__ */ React2.createElement("div", {
@@ -1108,14 +1195,14 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
   }, label), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "14px", fontWeight: 700, color: "#d1d9e6" }
   }, value)))))), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "18px" }
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "18px 20px", marginBottom: "16px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }
   }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
   }, "STARTER PACKS"), /* @__PURE__ */ React2.createElement("div", {
     style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7 }
-  }, "Professional example universes for first-time users. One click replaces the active universe and loads a ready-to-analyze set.")), /* @__PURE__ */ React2.createElement("div", {
+  }, "Professional example universes for first-time users. You can load the pack only, or load it and immediately run a default portfolio backtest.")), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#4a6a85" }
   }, "Recommended first pack: `Macro Core`")), /* @__PURE__ */ React2.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: "12px" }
@@ -1147,13 +1234,21 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
         borderRadius: "999px",
         padding: "3px 7px"
       }
-    }, symbol))), /* @__PURE__ */ React2.createElement("button", {
+    }, symbol))), /* @__PURE__ */ React2.createElement("div", {
+      style: { display: "flex", gap: "8px", flexWrap: "wrap" }
+    }, /* @__PURE__ */ React2.createElement("button", {
       className: "nav-tab",
       onClick: () => loadStarterPack(pack),
       disabled,
       style: isActive ? { background: "#0e2540", borderColor: "#1b3b2a", color: "#22c55e" } : {},
       title: pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Replace current universe with this pack"
-    }, importingPack === pack.id ? "LOADING PACK..." : "LOAD PACK"));
+    }, importingPack === pack.id ? "LOADING..." : "LOAD PACK"), /* @__PURE__ */ React2.createElement("button", {
+      className: "nav-tab on",
+      onClick: () => runStarterPack(pack),
+      disabled,
+      style: { background: "#0e2540", borderColor: "#143a61", color: "#8fb8d8" },
+      title: pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Load pack and immediately run the default backtest"
+    }, importingPack === `${pack.id}-run` ? "RUNNING..." : "LOAD + RUN")));
   }))), (searchBusy || searchResults.length > 0) && /* @__PURE__ */ React2.createElement("div", {
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "16px 18px", marginBottom: "18px" }
   }, /* @__PURE__ */ React2.createElement("div", {
@@ -1180,10 +1275,14 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
       style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#3a5a75" }
     }, (item.typeDisp || item.quoteType || "Yahoo").toUpperCase(), " \xB7 ", item.exchDisp || item.exchange || "Yahoo"));
   }))), /* @__PURE__ */ React2.createElement("div", {
-    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "18px" }
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "16px 20px", marginBottom: "16px" }
   }, /* @__PURE__ */ React2.createElement("div", {
-    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "12px" }
+    style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "10px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0" }
   }, "ACTIVE UNIVERSE"), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#4a6a85" }
+  }, "Click a ticker to remove it from the current research set.")), /* @__PURE__ */ React2.createElement("div", {
     style: { display: "flex", gap: "8px", flexWrap: "wrap" }
   }, universeTickers.map((ticker) => {
     const asset = assetMap[ticker];
@@ -1252,7 +1351,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
     defaultTickers: availableTickers,
     title: "Global Yahoo Portfolio Backtest",
     description: "Run portfolio backtests on any imported Yahoo-compatible assets.",
-    helperNote: "Search and import assets above. SPY remains the default benchmark."
+    helperNote: "Search, load a starter pack, or use LOAD + RUN above. SPY remains the default benchmark.",
+    autoRunRequest
   }));
 }
 
