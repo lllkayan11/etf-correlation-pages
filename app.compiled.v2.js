@@ -889,6 +889,33 @@ var describeCorr = (v) => {
     return "Low positive linkage. Diversification benefit is meaningful.";
   return "Negative linkage. This pair has historically offset each other during parts of the sample.";
 };
+var STARTER_PACKS = [
+  {
+    id: "macro-core",
+    title: "Macro Core",
+    subtitle: "Recommended starter pack",
+    description: "The fastest first test: equity beta, duration, gold and commodities in one professional cross-asset universe.",
+    symbols: ["SPY", "TLT", "GLD", "DBC"],
+    requiresBridge: false
+  },
+  {
+    id: "ai-platforms",
+    title: "AI Platforms",
+    subtitle: "Growth / semiconductor stack",
+    description: "A concentrated technology research basket for testing momentum, benchmark linkage and concentration risk.",
+    symbols: ["AAPL", "MSFT", "NVDA", "TSM"],
+    requiresBridge: true
+  },
+  {
+    id: "global-diversifiers",
+    title: "Global Diversifiers",
+    subtitle: "Cross-region mixed drivers",
+    description: "A broader regime-comparison set combining US equity, Japan, India, gold and Bitcoin.",
+    symbols: ["SPY", "EWJ", "INDA", "GLD", "BTC-USD"],
+    requiresBridge: true
+  }
+];
+var QUICK_SYMBOLS = ["AAPL", "MSFT", "NVDA", "TSM", "BTC-USD", "QQQ"];
 function MarketLabPanel({ baseAssets, baseOhlcData }) {
   const baseAssetMap = useMemo2(() => Object.fromEntries((baseAssets || []).map((asset) => [asset.ticker, asset])), [baseAssets]);
   const [bridgeReady, setBridgeReady] = useState2(false);
@@ -899,6 +926,7 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
   const [selectedPair, setSelectedPair] = useState2(null);
   const [status, setStatus] = useState2("");
   const [importingSymbol, setImportingSymbol] = useState2("");
+  const [importingPack, setImportingPack] = useState2("");
   const [assetMap, setAssetMap] = useState2(() => baseAssetMap);
   const [extraOhlc, setExtraOhlc] = useState2({});
   const [universeTickers, setUniverseTickers] = useState2(["SPY", "TLT", "GLD"]);
@@ -952,38 +980,67 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
   const availableTickers = useMemo2(() => universeTickers.filter((ticker) => Array.isArray(ohlcData?.[ticker]) && ohlcData[ticker].length), [ohlcData, universeTickers]);
   const universeAssets = useMemo2(() => availableTickers.map((ticker) => assetMap[ticker]).filter(Boolean), [assetMap, availableTickers]);
   const corrData = useMemo2(() => computeCorrelationLookupFromOhlc(ohlcData, availableTickers), [ohlcData, availableTickers]);
-  const importSymbol = async (symbol, quote) => {
-    const nextSymbol = (symbol || "").trim().toUpperCase();
-    if (!nextSymbol)
+  const importSymbols = async (symbols, { replaceUniverse = false, packLabel = "" } = {}) => {
+    const nextSymbols = Array.from(new Set((symbols || []).map((item) => (item || "").trim().toUpperCase()).filter(Boolean)));
+    if (!nextSymbols.length)
       return;
     setStatus("");
-    if (ohlcData?.[nextSymbol]?.length) {
-      setUniverseTickers((prev) => prev.includes(nextSymbol) ? prev : [...prev, nextSymbol]);
+    setSelectedPair(null);
+    const missingSymbols = nextSymbols.filter((symbol) => !(ohlcData?.[symbol] || []).length);
+    if (missingSymbols.length && !bridgeReady) {
+      setStatus("Local Yahoo bridge is required to import new symbols. Start local_refresh_server.py first.");
       setQuery("");
       return;
     }
     try {
-      setImportingSymbol(nextSymbol);
-      const payload = await fetchYahooHistory(nextSymbol, "10y");
-      const asset = assetFromQuote({
-        symbol: nextSymbol,
-        longname: payload?.meta?.name || quote?.longname,
-        shortname: payload?.meta?.shortName || quote?.shortname,
-        exchange: payload?.meta?.exchange || quote?.exchange,
-        exchDisp: payload?.meta?.exchange || quote?.exchDisp,
-        quoteType: payload?.meta?.quoteType || quote?.quoteType,
-        typeDisp: quote?.typeDisp || payload?.meta?.quoteType
-      }, baseAssetMap);
-      setAssetMap((prev) => ({ ...prev, [nextSymbol]: asset }));
-      setExtraOhlc((prev) => ({ ...prev, [nextSymbol]: payload?.ohlc || [] }));
-      setUniverseTickers((prev) => prev.includes(nextSymbol) ? prev : [...prev, nextSymbol]);
+      const nextAssetMap = {};
+      const nextExtraOhlc = {};
+      for (const nextSymbol of nextSymbols) {
+        if ((ohlcData?.[nextSymbol] || []).length)
+          continue;
+        setImportingSymbol(nextSymbol);
+        const payload = await fetchYahooHistory(nextSymbol, "10y");
+        nextAssetMap[nextSymbol] = assetFromQuote({
+          symbol: nextSymbol,
+          longname: payload?.meta?.name,
+          shortname: payload?.meta?.shortName,
+          exchange: payload?.meta?.exchange,
+          exchDisp: payload?.meta?.exchange,
+          quoteType: payload?.meta?.quoteType,
+          typeDisp: payload?.meta?.quoteType
+        }, baseAssetMap);
+        nextExtraOhlc[nextSymbol] = payload?.ohlc || [];
+      }
+      if (Object.keys(nextAssetMap).length) {
+        setAssetMap((prev) => ({ ...prev, ...nextAssetMap }));
+      }
+      if (Object.keys(nextExtraOhlc).length) {
+        setExtraOhlc((prev) => ({ ...prev, ...nextExtraOhlc }));
+      }
+      setUniverseTickers((prev) => replaceUniverse ? nextSymbols : Array.from(new Set([...prev, ...nextSymbols])));
       setQuery("");
       setSearchResults([]);
-      setStatus(`${nextSymbol} imported from Yahoo history.`);
+      setStatus(packLabel ? `${packLabel} loaded: ${nextSymbols.join(", ")}` : `${nextSymbols.join(", ")} imported from Yahoo history.`);
     } catch (error) {
-      setStatus(error?.message || `Failed to import ${nextSymbol}.`);
+      setStatus(error?.message || `Failed to import ${nextSymbols.join(", ")}.`);
     } finally {
       setImportingSymbol("");
+    }
+  };
+  const importSymbol = async (symbol) => {
+    const nextSymbol = (symbol || "").trim().toUpperCase();
+    if (!nextSymbol)
+      return;
+    await importSymbols([nextSymbol]);
+  };
+  const loadStarterPack = async (pack) => {
+    if (!pack)
+      return;
+    try {
+      setImportingPack(pack.id);
+      await importSymbols(pack.symbols, { replaceUniverse: true, packLabel: pack.title });
+    } finally {
+      setImportingPack("");
     }
   };
   const removeTicker = (ticker) => {
@@ -1011,15 +1068,22 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
     onChange: (e) => setQuery(e.target.value),
     onKeyDown: (e) => {
       if (e.key === "Enter") {
-        importSymbol(query, null);
+        importSymbol(query);
       }
     }
   }), /* @__PURE__ */ React2.createElement("button", {
     className: "nav-tab on",
-    onClick: () => importSymbol(query, null),
-    disabled: !bridgeReady || !query.trim() || !!importingSymbol,
+    onClick: () => importSymbol(query),
+    disabled: !bridgeReady || !query.trim() || !!importingSymbol || !!importingPack,
     style: { background: "#0e2540", borderColor: "#143a61", color: "#8fb8d8" }
   }, importingSymbol ? `IMPORTING ${importingSymbol}...` : "ADD SYMBOL")), /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }
+  }, QUICK_SYMBOLS.map((symbol) => /* @__PURE__ */ React2.createElement("button", {
+    key: symbol,
+    className: "filter-pill",
+    onClick: () => setQuery(symbol),
+    title: `Use ${symbol} as a search shortcut`
+  }, symbol))), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: bridgeReady ? "#22c55e" : "#f59e0b", marginBottom: "8px" }
   }, bridgeMessage), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#3a5a75" }
@@ -1043,7 +1107,54 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#1e3a55", letterSpacing: ".1em", marginBottom: "6px" }
   }, label), /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "14px", fontWeight: 700, color: "#d1d9e6" }
-  }, value)))))), (searchBusy || searchResults.length > 0) && /* @__PURE__ */ React2.createElement("div", {
+  }, value)))))), /* @__PURE__ */ React2.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px", marginBottom: "18px" }
+  }, /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }
+  }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
+  }, "STARTER PACKS"), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7 }
+  }, "Professional example universes for first-time users. One click replaces the active universe and loads a ready-to-analyze set.")), /* @__PURE__ */ React2.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#4a6a85" }
+  }, "Recommended first pack: `Macro Core`")), /* @__PURE__ */ React2.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: "12px" }
+  }, STARTER_PACKS.map((pack) => {
+    const disabled = !!importingSymbol || !!importingPack || pack.requiresBridge && !bridgeReady;
+    const isActive = pack.symbols.length === universeTickers.length && pack.symbols.every((symbol) => universeTickers.includes(symbol));
+    return /* @__PURE__ */ React2.createElement("div", {
+      key: pack.id,
+      style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "10px", padding: "14px 16px" }
+    }, /* @__PURE__ */ React2.createElement("div", {
+      style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "6px" }
+    }, /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", {
+      style: { fontWeight: 700, fontSize: "15px", color: "#f0f6ff" }
+    }, pack.title), /* @__PURE__ */ React2.createElement("div", {
+      style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#8fb8d8", letterSpacing: ".08em", marginTop: "3px" }
+    }, pack.subtitle)), isActive ? /* @__PURE__ */ React2.createElement("div", {
+      style: { fontFamily: "'Syne Mono',monospace", fontSize: "9px", color: "#22c55e" }
+    }, "ACTIVE") : null), /* @__PURE__ */ React2.createElement("div", {
+      style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.6, marginBottom: "10px" }
+    }, pack.description), /* @__PURE__ */ React2.createElement("div", {
+      style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }
+    }, pack.symbols.map((symbol) => /* @__PURE__ */ React2.createElement("span", {
+      key: symbol,
+      style: {
+        fontFamily: "'Syne Mono',monospace",
+        fontSize: "9px",
+        color: assetMap[symbol]?.color || colorFromTicker(symbol),
+        border: `1px solid ${assetMap[symbol]?.color || colorFromTicker(symbol)}33`,
+        borderRadius: "999px",
+        padding: "3px 7px"
+      }
+    }, symbol))), /* @__PURE__ */ React2.createElement("button", {
+      className: "nav-tab",
+      onClick: () => loadStarterPack(pack),
+      disabled,
+      style: isActive ? { background: "#0e2540", borderColor: "#1b3b2a", color: "#22c55e" } : {},
+      title: pack.requiresBridge && !bridgeReady ? "Requires local Yahoo bridge" : "Replace current universe with this pack"
+    }, importingPack === pack.id ? "LOADING PACK..." : "LOAD PACK"));
+  }))), (searchBusy || searchResults.length > 0) && /* @__PURE__ */ React2.createElement("div", {
     style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "16px 18px", marginBottom: "18px" }
   }, /* @__PURE__ */ React2.createElement("div", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0", marginBottom: "12px" }
@@ -1061,8 +1172,8 @@ function MarketLabPanel({ baseAssets, baseOhlcData }) {
       style: { fontFamily: "'Syne Mono',monospace", fontSize: "13px", fontWeight: 700, color: colorFromTicker(symbol) }
     }, symbol), /* @__PURE__ */ React2.createElement("button", {
       className: "filter-pill",
-      onClick: () => importSymbol(symbol, item),
-      disabled: !!importingSymbol
+      onClick: () => importSymbol(symbol),
+      disabled: !!importingSymbol || !!importingPack
     }, imported ? "ADDED" : "IMPORT")), /* @__PURE__ */ React2.createElement("div", {
       style: { fontSize: "12px", color: "#d1d9e6", marginBottom: "5px" }
     }, item.longname || item.shortname || symbol), /* @__PURE__ */ React2.createElement("div", {

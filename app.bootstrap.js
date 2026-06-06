@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./app.compiled.v2.js?v=uxflow-20260606";
+import App from "./app.compiled.v2.js?v=starterpacks-20260606";
 
 const rootElement = document.getElementById("root");
 if (rootElement) {
