@@ -89,7 +89,7 @@ const STARTER_PACKS = [
 
 const QUICK_SYMBOLS = ["AAPL", "MSFT", "NVDA", "TSM", "BTC-USD", "QQQ"];
 
-export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
+export default function MarketLabPanel({ baseAssets, baseOhlcData, autoRunPackId }) {
   const baseAssetMap = useMemo(
     () => Object.fromEntries((baseAssets || []).map((asset) => [asset.ticker, asset])),
     [baseAssets],
@@ -261,6 +261,14 @@ export default function MarketLabPanel({ baseAssets, baseOhlcData }) {
       setImportingPack("");
     }
   };
+
+  useEffect(() => {
+    if (!autoRunPackId) return;
+    const packId = String(autoRunPackId).split("-").slice(0, -1).join("-") || String(autoRunPackId);
+    const pack = STARTER_PACKS.find((item) => item.id === packId);
+    if (!pack) return;
+    runStarterPack(pack);
+  }, [autoRunPackId]);
 
   const removeTicker = (ticker) => {
     if (universeTickers.length <= 2) return;

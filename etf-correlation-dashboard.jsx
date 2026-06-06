@@ -5012,13 +5012,137 @@ const isLocalBridgeHost = () => {
   return (hostname === "127.0.0.1" || hostname === "localhost") && port === "8765";
 };
 
+const TUTORIAL_STORAGE_KEY = "etf_dashboard_onboarding_v1";
+
+const getModeGuide = (tab, bridgeReady) => {
+  if (tab === "matrix") {
+    return {
+      mode: "ETF Matrix Mode",
+      next: "先看相关性高低，再决定哪些资产值得进入价格图或回测。",
+    };
+  }
+  if (tab === "chart") {
+    return {
+      mode: "Price Inspection Mode",
+      next: "观察趋势、波动和 RSI 后，再切到回测验证组合表现。",
+    };
+  }
+  if (tab === "backtest") {
+    return {
+      mode: "Portfolio Backtest Mode",
+      next: "先选组合与权重，再运行回测；如果要研究任意 Yahoo 标的，切到 UNIVERSE LAB。",
+    };
+  }
+  if (tab === "lab") {
+    return {
+      mode: "Universe Lab Mode",
+      next: bridgeReady
+        ? "最快方式是直接点击 Starter Pack 的 LOAD + RUN。"
+        : "先启动 local_refresh_server.py，再用 Starter Pack 或搜索导入任意 Yahoo 标的。",
+    };
+  }
+  if (tab === "report") {
+    return {
+      mode: "Supervisor Report Mode",
+      next: "看完总结后，回到 CORR MATRIX 或 UNIVERSE LAB 继续分析。",
+    };
+  }
+  return {
+    mode: "Data Source Mode",
+    next: "确认数据口径后，回到 MATRIX、CHART 或 LAB 进入正式分析。",
+  };
+};
+
+function OnboardingTutorial({
+  open,
+  bridgeReady,
+  onClose,
+  onStartMatrix,
+  onStartLab,
+  onStartPack,
+}) {
+  if (!open) return null;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(3,8,16,.78)",backdropFilter:"blur(6px)",zIndex:60,display:"grid",placeItems:"center",padding:"24px"}}>
+      <div style={{width:"min(980px, 100%)",background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"16px",boxShadow:"0 20px 60px rgba(0,0,0,.45)",overflow:"hidden"}}>
+        <div style={{padding:"22px 24px",borderBottom:"1px solid #0a1a2e",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"16px"}}>
+          <div>
+            <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>FIRST-TIME GUIDE</div>
+            <div style={{fontWeight:800,fontSize:"22px",color:"#f0f6ff",marginBottom:"8px"}}>3 steps to start using the dashboard correctly</div>
+            <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7}}>
+              This project now has two valid workflows: the published ETF dashboard and the local full-Yahoo research terminal. Choose one instead of exploring tabs blindly.
+            </div>
+          </div>
+          <button className="nav-tab" onClick={onClose}>SKIP</button>
+        </div>
+
+        <div style={{padding:"22px 24px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:"14px"}}>
+          <div style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"12px",padding:"16px 18px"}}>
+            <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fb8d8",marginBottom:"8px"}}>STEP 1 · QUICK ETF WORKFLOW</div>
+            <div style={{fontWeight:700,fontSize:"16px",color:"#f0f6ff",marginBottom:"8px"}}>Start with the 10-ETF matrix</div>
+            <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"12px"}}>
+              Best when you want a fast institutional overview of diversification, chart structure and portfolio behaviour using the curated ETF universe.
+            </div>
+            <button className="nav-tab on" onClick={onStartMatrix}>START ETF MATRIX</button>
+          </div>
+
+          <div style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"12px",padding:"16px 18px"}}>
+            <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fb8d8",marginBottom:"8px"}}>STEP 2 · FULL MARKET WORKFLOW</div>
+            <div style={{fontWeight:700,fontSize:"16px",color:"#f0f6ff",marginBottom:"8px"}}>Use Universe Lab for any Yahoo symbol</div>
+            <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"12px"}}>
+              Best when you want to search and test arbitrary stocks, ETFs, ADRs or crypto symbols. This works best with the local Yahoo bridge.
+            </div>
+            <button
+              className={`nav-tab ${bridgeReady ? "on" : ""}`}
+              onClick={onStartLab}
+              style={bridgeReady ? {background:"#0e2540",borderColor:"#143a61",color:"#8fb8d8"} : {}}
+            >
+              OPEN UNIVERSE LAB
+            </button>
+          </div>
+
+          <div style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"12px",padding:"16px 18px"}}>
+            <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fb8d8",marginBottom:"8px"}}>STEP 3 · RECOMMENDED FIRST ACTION</div>
+            <div style={{fontWeight:700,fontSize:"16px",color:"#f0f6ff",marginBottom:"8px"}}>Run the recommended starter pack</div>
+            <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"12px"}}>
+              If you want the fastest “show me something useful now” path, use `Macro Core` and run the default backtest immediately.
+            </div>
+            <button
+              className="nav-tab on"
+              onClick={onStartPack}
+              disabled={!bridgeReady}
+              style={{background:"#0e2540",borderColor:"#143a61",color:"#8fb8d8"}}
+            >
+              OPEN MACRO CORE FLOW
+            </button>
+            {!bridgeReady ? (
+              <div style={{marginTop:"10px",fontFamily:"'Syne Mono',monospace",fontSize:"9px",color:"#f59e0b"}}>
+                Start `local_refresh_server.py` first to use the full Yahoo workflow.
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div style={{padding:"0 24px 22px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#4a6a85"}}>
+            You can reopen this tutorial anytime from the header via `HOW TO USE`.
+          </div>
+          <button className="nav-tab" onClick={onClose}>GOT IT</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WorkflowLaunchpad({
   bridgeReady,
   bridgeChecked,
+  tab,
   onOpenMatrix,
   onOpenChart,
   onOpenBacktest,
   onOpenLab,
+  onShowTutorial,
 }) {
   const statusTone = bridgeReady ? "#22c55e" : bridgeChecked ? "#f59e0b" : "#8fb8d8";
   const statusText = bridgeReady
@@ -5026,6 +5150,7 @@ function WorkflowLaunchpad({
     : bridgeChecked
       ? "Online ETF dashboard is ready. To unlock arbitrary Yahoo symbol search, start local_refresh_server.py and open http://127.0.0.1:8765/."
       : "Checking whether the local Yahoo bridge is available...";
+  const modeGuide = getModeGuide(tab, bridgeReady);
 
   return (
     <div style={{padding:"18px 28px",borderBottom:"1px solid #08172a",background:"linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))"}}>
@@ -5048,16 +5173,17 @@ function WorkflowLaunchpad({
             >
               OPEN UNIVERSE LAB
             </button>
+            <button className="nav-tab" onClick={onShowTutorial}>HOW TO USE</button>
           </div>
         </div>
 
         <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
-          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"12px"}}>BEST PRACTICE FLOW</div>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"12px"}}>CURRENT MODE GUIDE</div>
           <div style={{display:"grid",gap:"10px"}}>
             {[
-              ["1. Compare", "Use CORR MATRIX to understand diversification across the published ETF set."],
-              ["2. Inspect", "Use PRICE CHART to review candlesticks, volume, MA and RSI before building a portfolio."],
-              ["3. Expand", bridgeReady ? "Use UNIVERSE LAB to import any Yahoo-compatible asset and run dynamic analysis." : "When you need arbitrary Yahoo symbols, run local_refresh_server.py and then use UNIVERSE LAB."],
+              ["Current", modeGuide.mode],
+              ["Next Step", modeGuide.next],
+              ["Best Practice", bridgeReady ? "For the fastest full workflow, open UNIVERSE LAB and click Macro Core → LOAD + RUN." : "For the fastest start, use the ETF matrix online. When you need arbitrary Yahoo symbols, start local_refresh_server.py first."],
             ].map(([title, text]) => (
               <div key={title} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px",padding:"12px 14px"}}>
                 <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fb8d8",marginBottom:"4px"}}>{title}</div>
@@ -5087,6 +5213,8 @@ export default function App() {
   const [bridgeChecked, setBridgeChecked] = useState(false);
   const [tabChosenByUser, setTabChosenByUser] = useState(false);
   const [autoRoutedToLab, setAutoRoutedToLab] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [labAutoRunPackId, setLabAutoRunPackId] = useState(null);
 
   const loadLocalJsonData = async () => {
     const ts = Date.now();
@@ -5163,6 +5291,14 @@ export default function App() {
     }
   }, [autoRoutedToLab, bridgeReady, tabChosenByUser]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const seen = window.localStorage.getItem(TUTORIAL_STORAGE_KEY);
+    if (!seen) {
+      setShowTutorial(true);
+    }
+  }, []);
+
   const allData = useMemo(()=> ETFS.reduce((a,e)=>({...a,[e.ticker]:(monthlyData[e.ticker] || generatePriceData(e))}),{}), [monthlyData]);
   const priceData = useMemo(()=>allData[selected.ticker],[selected,allData]);
   const dailyOhlcData = useMemo(() => {
@@ -5180,6 +5316,20 @@ export default function App() {
   const openTab = (nextTab) => {
     setTabChosenByUser(true);
     setTab(nextTab);
+  };
+
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(TUTORIAL_STORAGE_KEY, "seen");
+    }
+  };
+
+  const startMacroCoreFlow = () => {
+    setTabChosenByUser(true);
+    setLabAutoRunPackId(`macro-core-${Date.now()}`);
+    setTab("lab");
+    closeTutorial();
   };
 
   const avgCorr = useMemo(()=>{
@@ -5219,6 +5369,14 @@ export default function App() {
         <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
           <button
             className="nav-tab"
+            onClick={() => setShowTutorial(true)}
+            style={{borderColor:"#0a1a2e"}}
+            title="Open first-time usage guide."
+          >
+            HOW TO USE
+          </button>
+          <button
+            className="nav-tab"
             onClick={handleRefreshData}
             disabled={isRefreshing}
             style={{color:isRefreshing ? "#4a6a85" : "#22c55e", borderColor:"#1b3b2a"}}
@@ -5237,13 +5395,30 @@ export default function App() {
         </div>
       )}
 
+      <OnboardingTutorial
+        open={showTutorial}
+        bridgeReady={bridgeReady}
+        onClose={closeTutorial}
+        onStartMatrix={() => {
+          openTab("matrix");
+          closeTutorial();
+        }}
+        onStartLab={() => {
+          openTab("lab");
+          closeTutorial();
+        }}
+        onStartPack={startMacroCoreFlow}
+      />
+
       <WorkflowLaunchpad
         bridgeReady={bridgeReady}
         bridgeChecked={bridgeChecked}
+        tab={tab}
         onOpenMatrix={() => openTab("matrix")}
         onOpenChart={() => openTab("chart")}
         onOpenBacktest={() => openTab("backtest")}
         onOpenLab={() => openTab("lab")}
+        onShowTutorial={() => setShowTutorial(true)}
       />
 
       {/* ETF SELECTOR */}
@@ -5471,7 +5646,7 @@ export default function App() {
         )}
 
         {tab==="lab" && (
-          <MarketLabPanel baseAssets={ETFS} baseOhlcData={ohlcData} />
+          <MarketLabPanel baseAssets={ETFS} baseOhlcData={ohlcData} autoRunPackId={labAutoRunPackId} />
         )}
 
         {/* ══════════════════════════════ SUPERVISOR REPORT ══════════════════════════════ */}
