@@ -6276,6 +6276,70 @@ var CandlestickChart = ({ data }) => {
     style: { fontSize: "10px", color: "#8fa8c0", textAlign: "right", lineHeight: 1.5 }
   }, /* @__PURE__ */ React3.createElement("div", null, hovered.date), /* @__PURE__ */ React3.createElement("div", null, "O ", hovered.open.toFixed(2), " \xB7 H ", hovered.high.toFixed(2), " \xB7 L ", hovered.low.toFixed(2), " \xB7 C ", hovered.close.toFixed(2)), /* @__PURE__ */ React3.createElement("div", null, "Adj ", hovered.adjClose.toFixed(2), " \xB7 Vol ", fmtVol(hovered.volume), " \xB7 MA5 ", hoveredMa5 ? hoveredMa5.toFixed(2) : "N/A", " \xB7 MA20 ", hoveredMa20 ? hoveredMa20.toFixed(2) : "N/A", " \xB7 RSI14 ", hoveredRsi != null ? hoveredRsi.toFixed(2) : "N/A"))));
 };
+var isLocalBridgeHost = () => {
+  if (typeof window === "undefined")
+    return false;
+  const { hostname, port } = window.location;
+  return (hostname === "127.0.0.1" || hostname === "localhost") && port === "8765";
+};
+function WorkflowLaunchpad({
+  bridgeReady,
+  bridgeChecked,
+  onOpenMatrix,
+  onOpenChart,
+  onOpenBacktest,
+  onOpenLab
+}) {
+  const statusTone = bridgeReady ? "#22c55e" : bridgeChecked ? "#f59e0b" : "#8fb8d8";
+  const statusText = bridgeReady ? "Full Yahoo universe mode is ready. Best next step: open UNIVERSE LAB." : bridgeChecked ? "Online ETF dashboard is ready. To unlock arbitrary Yahoo symbol search, start local_refresh_server.py and open http://127.0.0.1:8765/." : "Checking whether the local Yahoo bridge is available...";
+  return /* @__PURE__ */ React3.createElement("div", {
+    style: { padding: "18px 28px", borderBottom: "1px solid #08172a", background: "linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: "16px", alignItems: "stretch" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "6px" }
+  }, "START HERE"), /* @__PURE__ */ React3.createElement("div", {
+    style: { fontWeight: 800, fontSize: "18px", color: "#f0f6ff", marginBottom: "8px" }
+  }, "Choose the fastest workflow for what you want to do"), /* @__PURE__ */ React3.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.7, marginBottom: "12px" }
+  }, "This dashboard now supports both a published 10-ETF workflow and a full Yahoo universe workflow. Use the path below that matches your goal instead of guessing which tab to start with."), /* @__PURE__ */ React3.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: statusTone, marginBottom: "14px" }
+  }, statusText), /* @__PURE__ */ React3.createElement("div", {
+    style: { display: "flex", gap: "8px", flexWrap: "wrap" }
+  }, /* @__PURE__ */ React3.createElement("button", {
+    className: "nav-tab on",
+    onClick: onOpenMatrix
+  }, "START ETF MATRIX"), /* @__PURE__ */ React3.createElement("button", {
+    className: "nav-tab",
+    onClick: onOpenChart
+  }, "OPEN PRICE CHART"), /* @__PURE__ */ React3.createElement("button", {
+    className: "nav-tab",
+    onClick: onOpenBacktest
+  }, "ETF BACKTEST"), /* @__PURE__ */ React3.createElement("button", {
+    className: `nav-tab ${bridgeReady ? "on" : ""}`,
+    onClick: onOpenLab,
+    style: bridgeReady ? { color: "#22c55e", borderColor: "#1b3b2a" } : {}
+  }, "OPEN UNIVERSE LAB"))), /* @__PURE__ */ React3.createElement("div", {
+    style: { background: "#060e1c", border: "1px solid #0a1e32", borderRadius: "12px", padding: "20px 22px" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", letterSpacing: ".12em", marginBottom: "12px" }
+  }, "BEST PRACTICE FLOW"), /* @__PURE__ */ React3.createElement("div", {
+    style: { display: "grid", gap: "10px" }
+  }, [
+    ["1. Compare", "Use CORR MATRIX to understand diversification across the published ETF set."],
+    ["2. Inspect", "Use PRICE CHART to review candlesticks, volume, MA and RSI before building a portfolio."],
+    ["3. Expand", bridgeReady ? "Use UNIVERSE LAB to import any Yahoo-compatible asset and run dynamic analysis." : "When you need arbitrary Yahoo symbols, run local_refresh_server.py and then use UNIVERSE LAB."]
+  ].map(([title, text]) => /* @__PURE__ */ React3.createElement("div", {
+    key: title,
+    style: { background: "#030810", border: "1px solid #0a1a2e", borderRadius: "8px", padding: "12px 14px" }
+  }, /* @__PURE__ */ React3.createElement("div", {
+    style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fb8d8", marginBottom: "4px" }
+  }, title), /* @__PURE__ */ React3.createElement("div", {
+    style: { fontSize: "12px", color: "#7a9ab5", lineHeight: 1.6 }
+  }, text)))))));
+}
 function App() {
   const [tab, setTab] = useState3("matrix");
   const [selected, setSelected] = useState3(ETFS[0]);
@@ -6288,6 +6352,10 @@ function App() {
   const [chartRange, setChartRange] = useState3("ALL");
   const [isRefreshing, setIsRefreshing] = useState3(false);
   const [refreshMessage, setRefreshMessage] = useState3("");
+  const [bridgeReady, setBridgeReady] = useState3(false);
+  const [bridgeChecked, setBridgeChecked] = useState3(false);
+  const [tabChosenByUser, setTabChosenByUser] = useState3(false);
+  const [autoRoutedToLab, setAutoRoutedToLab] = useState3(false);
   const loadLocalJsonData = async () => {
     const ts = Date.now();
     const [monthlyRes, corrRes, ohlcRes] = await Promise.all([
@@ -6330,6 +6398,31 @@ function App() {
       setRefreshMessage("Using embedded fallback data.");
     });
   }, []);
+  useEffect3(() => {
+    let active = true;
+    probeYahooBridge().then(() => {
+      if (!active)
+        return;
+      setBridgeReady(true);
+      setBridgeChecked(true);
+    }).catch(() => {
+      if (!active)
+        return;
+      setBridgeReady(false);
+      setBridgeChecked(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect3(() => {
+    if (autoRoutedToLab || tabChosenByUser)
+      return;
+    if (bridgeReady && isLocalBridgeHost()) {
+      setTab("lab");
+      setAutoRoutedToLab(true);
+    }
+  }, [autoRoutedToLab, bridgeReady, tabChosenByUser]);
   const allData = useMemo3(() => ETFS.reduce((a, e) => ({ ...a, [e.ticker]: monthlyData[e.ticker] || generatePriceData(e) }), {}), [monthlyData]);
   const priceData = useMemo3(() => allData[selected.ticker], [selected, allData]);
   const dailyOhlcData = useMemo3(() => {
@@ -6340,6 +6433,11 @@ function App() {
   const lastP = dailyOhlcData[dailyOhlcData.length - 1]?.close ?? priceData[priceData.length - 1]?.price ?? 1;
   const totalRet = ((lastP - firstP) / firstP * 100).toFixed(1);
   const displayETFs = ETFS.filter((e) => visibleETFs.includes(e.id));
+  const showGlobalSelector = tab === "matrix" || tab === "chart" || tab === "report";
+  const openTab = (nextTab) => {
+    setTabChosenByUser(true);
+    setTab(nextTab);
+  };
   const avgCorr = useMemo3(() => {
     const idx = selected.id;
     const row = corrMatrix[idx].filter((_, i) => i !== idx && visibleETFs.includes(i));
@@ -6385,10 +6483,17 @@ function App() {
   }, isRefreshing ? "RELOADING..." : "RELOAD DATA"), [["matrix", "CORR MATRIX"], ["chart", "PRICE CHART"], ["backtest", "BACKTEST"], ["lab", "UNIVERSE LAB"], ["report", "SUPERVISOR REPORT"], ["sources", "DATA SOURCES"]].map(([v, l]) => /* @__PURE__ */ React3.createElement("button", {
     key: v,
     className: `nav-tab ${tab === v ? "on" : ""}`,
-    onClick: () => setTab(v)
+    onClick: () => openTab(v)
   }, l)))), refreshMessage && /* @__PURE__ */ React3.createElement("div", {
     style: { padding: "8px 28px", borderBottom: "1px solid #08172a", fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#8fa8c0" }
-  }, refreshMessage), /* @__PURE__ */ React3.createElement("div", {
+  }, refreshMessage), /* @__PURE__ */ React3.createElement(WorkflowLaunchpad, {
+    bridgeReady,
+    bridgeChecked,
+    onOpenMatrix: () => openTab("matrix"),
+    onOpenChart: () => openTab("chart"),
+    onOpenBacktest: () => openTab("backtest"),
+    onOpenLab: () => openTab("lab")
+  }), showGlobalSelector && /* @__PURE__ */ React3.createElement("div", {
     style: { padding: "14px 28px", borderBottom: "1px solid #08172a", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }
   }, /* @__PURE__ */ React3.createElement("span", {
     style: { fontFamily: "'Syne Mono',monospace", fontSize: "10px", color: "#1e3a55", marginRight: "4px", letterSpacing: ".08em" }

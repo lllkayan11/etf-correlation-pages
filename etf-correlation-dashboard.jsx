@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import BacktestPanel from "./backtest-panel.jsx";
 import MarketLabPanel from "./market-lab-panel.jsx";
+import { probeYahooBridge } from "./yahoo-bridge-client.js";
 
 // ─── DATA SOURCES ─────────────────────────────────────────────────────────────
 // Price/correlation data now uses Yahoo Finance adjusted closes (Adj Close).
@@ -5005,6 +5006,71 @@ const CandlestickChart = ({ data }) => {
   );
 };
 
+const isLocalBridgeHost = () => {
+  if (typeof window === "undefined") return false;
+  const { hostname, port } = window.location;
+  return (hostname === "127.0.0.1" || hostname === "localhost") && port === "8765";
+};
+
+function WorkflowLaunchpad({
+  bridgeReady,
+  bridgeChecked,
+  onOpenMatrix,
+  onOpenChart,
+  onOpenBacktest,
+  onOpenLab,
+}) {
+  const statusTone = bridgeReady ? "#22c55e" : bridgeChecked ? "#f59e0b" : "#8fb8d8";
+  const statusText = bridgeReady
+    ? "Full Yahoo universe mode is ready. Best next step: open UNIVERSE LAB."
+    : bridgeChecked
+      ? "Online ETF dashboard is ready. To unlock arbitrary Yahoo symbol search, start local_refresh_server.py and open http://127.0.0.1:8765/."
+      : "Checking whether the local Yahoo bridge is available...";
+
+  return (
+    <div style={{padding:"18px 28px",borderBottom:"1px solid #08172a",background:"linear-gradient(180deg, rgba(6,14,28,.96), rgba(3,8,16,.98))"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1.2fr .8fr",gap:"16px",alignItems:"stretch"}}>
+        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"6px"}}>START HERE</div>
+          <div style={{fontWeight:800,fontSize:"18px",color:"#f0f6ff",marginBottom:"8px"}}>Choose the fastest workflow for what you want to do</div>
+          <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.7,marginBottom:"12px"}}>
+            This dashboard now supports both a published 10-ETF workflow and a full Yahoo universe workflow. Use the path below that matches your goal instead of guessing which tab to start with.
+          </div>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:statusTone,marginBottom:"14px"}}>{statusText}</div>
+          <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+            <button className="nav-tab on" onClick={onOpenMatrix}>START ETF MATRIX</button>
+            <button className="nav-tab" onClick={onOpenChart}>OPEN PRICE CHART</button>
+            <button className="nav-tab" onClick={onOpenBacktest}>ETF BACKTEST</button>
+            <button
+              className={`nav-tab ${bridgeReady ? "on" : ""}`}
+              onClick={onOpenLab}
+              style={bridgeReady ? {color:"#22c55e", borderColor:"#1b3b2a"} : {}}
+            >
+              OPEN UNIVERSE LAB
+            </button>
+          </div>
+        </div>
+
+        <div style={{background:"#060e1c",border:"1px solid #0a1e32",borderRadius:"12px",padding:"20px 22px"}}>
+          <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",letterSpacing:".12em",marginBottom:"12px"}}>BEST PRACTICE FLOW</div>
+          <div style={{display:"grid",gap:"10px"}}>
+            {[
+              ["1. Compare", "Use CORR MATRIX to understand diversification across the published ETF set."],
+              ["2. Inspect", "Use PRICE CHART to review candlesticks, volume, MA and RSI before building a portfolio."],
+              ["3. Expand", bridgeReady ? "Use UNIVERSE LAB to import any Yahoo-compatible asset and run dynamic analysis." : "When you need arbitrary Yahoo symbols, run local_refresh_server.py and then use UNIVERSE LAB."],
+            ].map(([title, text]) => (
+              <div key={title} style={{background:"#030810",border:"1px solid #0a1a2e",borderRadius:"8px",padding:"12px 14px"}}>
+                <div style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#8fb8d8",marginBottom:"4px"}}>{title}</div>
+                <div style={{fontSize:"12px",color:"#7a9ab5",lineHeight:1.6}}>{text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState("matrix"); // matrix | chart | report | sources
   const [selected, setSelected] = useState(ETFS[0]);
@@ -5017,6 +5083,10 @@ export default function App() {
   const [chartRange, setChartRange] = useState("ALL");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState("");
+  const [bridgeReady, setBridgeReady] = useState(false);
+  const [bridgeChecked, setBridgeChecked] = useState(false);
+  const [tabChosenByUser, setTabChosenByUser] = useState(false);
+  const [autoRoutedToLab, setAutoRoutedToLab] = useState(false);
 
   const loadLocalJsonData = async () => {
     const ts = Date.now();
@@ -5067,6 +5137,32 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    probeYahooBridge()
+      .then(() => {
+        if (!active) return;
+        setBridgeReady(true);
+        setBridgeChecked(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setBridgeReady(false);
+        setBridgeChecked(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (autoRoutedToLab || tabChosenByUser) return;
+    if (bridgeReady && isLocalBridgeHost()) {
+      setTab("lab");
+      setAutoRoutedToLab(true);
+    }
+  }, [autoRoutedToLab, bridgeReady, tabChosenByUser]);
+
   const allData = useMemo(()=> ETFS.reduce((a,e)=>({...a,[e.ticker]:(monthlyData[e.ticker] || generatePriceData(e))}),{}), [monthlyData]);
   const priceData = useMemo(()=>allData[selected.ticker],[selected,allData]);
   const dailyOhlcData = useMemo(() => {
@@ -5079,6 +5175,12 @@ export default function App() {
   const totalRet = (((lastP-firstP)/firstP)*100).toFixed(1);
 
   const displayETFs = ETFS.filter(e => visibleETFs.includes(e.id));
+  const showGlobalSelector = tab === "matrix" || tab === "chart" || tab === "report";
+
+  const openTab = (nextTab) => {
+    setTabChosenByUser(true);
+    setTab(nextTab);
+  };
 
   const avgCorr = useMemo(()=>{
     const idx = selected.id;
@@ -5125,7 +5227,7 @@ export default function App() {
             {isRefreshing ? "RELOADING..." : "RELOAD DATA"}
           </button>
           {[["matrix","CORR MATRIX"],["chart","PRICE CHART"],["backtest","BACKTEST"],["lab","UNIVERSE LAB"],["report","SUPERVISOR REPORT"],["sources","DATA SOURCES"]].map(([v,l])=>(
-            <button key={v} className={`nav-tab ${tab===v?"on":""}`} onClick={()=>setTab(v)}>{l}</button>
+            <button key={v} className={`nav-tab ${tab===v?"on":""}`} onClick={()=>openTab(v)}>{l}</button>
           ))}
         </div>
       </div>
@@ -5135,15 +5237,26 @@ export default function App() {
         </div>
       )}
 
+      <WorkflowLaunchpad
+        bridgeReady={bridgeReady}
+        bridgeChecked={bridgeChecked}
+        onOpenMatrix={() => openTab("matrix")}
+        onOpenChart={() => openTab("chart")}
+        onOpenBacktest={() => openTab("backtest")}
+        onOpenLab={() => openTab("lab")}
+      />
+
       {/* ETF SELECTOR */}
-      <div style={{padding:"14px 28px",borderBottom:"1px solid #08172a",display:"flex",gap:"8px",flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",marginRight:"4px",letterSpacing:".08em"}}>SELECT ▸</span>
-        {ETFS.map(e=>(
-          <button key={e.ticker} className={`etf-pill ${selected.ticker===e.ticker?"on":""}`} style={{"--c":e.color}} onClick={()=>setSelected(e)}>
-            {e.ticker} <span style={{opacity:.5,fontSize:"9px"}}>{e.region}</span>
-          </button>
-        ))}
-      </div>
+      {showGlobalSelector && (
+        <div style={{padding:"14px 28px",borderBottom:"1px solid #08172a",display:"flex",gap:"8px",flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontFamily:"'Syne Mono',monospace",fontSize:"10px",color:"#1e3a55",marginRight:"4px",letterSpacing:".08em"}}>SELECT ▸</span>
+          {ETFS.map(e=>(
+            <button key={e.ticker} className={`etf-pill ${selected.ticker===e.ticker?"on":""}`} style={{"--c":e.color}} onClick={()=>setSelected(e)}>
+              {e.ticker} <span style={{opacity:.5,fontSize:"9px"}}>{e.region}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={{padding:"24px 28px"}} className="fade" key={tab+selected.ticker}>
 
